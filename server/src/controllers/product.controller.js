@@ -8,7 +8,7 @@ const { fileToDataUrl } = require('../middleware/upload.middleware');
 const productInclude = {
   images: { orderBy: { order: 'asc' } },
   variants: true,
-  category: { select: { id: true, name: true, slug: true } },
+  categories: { select: { id: true, name: true, slug: true } },
 };
 
 // Light include — use for listing endpoints. Returns only the primary
@@ -22,8 +22,32 @@ const productListInclude = {
   variants: {
     select: { id: true, size: true, color: true, colorHex: true, stock: true },
   },
-  category: { select: { id: true, name: true, slug: true } },
+  categories: { select: { id: true, name: true, slug: true } },
 };
+
+// Multi-attribute fields — accept either an array, a comma-separated string,
+// or a single string. Always returns an array of trimmed non-empty values.
+function toStringArray(value) {
+  if (value == null) return [];
+  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
+  return String(value)
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+// Resolve the list of category ids from the request body. Accepts the new
+// `categoryIds` array as well as the legacy `categoryId` single string.
+function toCategoryIds(body) {
+  if (Array.isArray(body.categoryIds)) {
+    return body.categoryIds.filter(Boolean);
+  }
+  if (typeof body.categoryIds === 'string' && body.categoryIds) {
+    return body.categoryIds.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  if (body.categoryId) return [body.categoryId];
+  return [];
+}
 
 // GET /api/products
 const listProducts = asyncHandler(async (req, res) => {
@@ -76,7 +100,7 @@ const newArrivals = asyncHandler(async (req, res) => {
 const byCategory = asyncHandler(async (req, res) => {
   const { categorySlug } = req.params;
   const products = await prisma.product.findMany({
-    where: { isActive: true, category: { slug: categorySlug } },
+    where: { isActive: true, categories: { some: { slug: categorySlug } } },
     include: productListInclude,
     orderBy: { createdAt: 'desc' },
   });
@@ -99,15 +123,18 @@ const getProduct = asyncHandler(async (req, res) => {
   });
   if (!product) throw new ApiError(404, 'Product not found');
 
-  const related = await prisma.product.findMany({
-    where: {
-      isActive: true,
-      categoryId: product.categoryId,
-      id: { not: product.id },
-    },
-    take: 4,
-    include: productListInclude,
-  });
+  const categoryIds = product.categories.map((c) => c.id);
+  const related = categoryIds.length
+    ? await prisma.product.findMany({
+        where: {
+          isActive: true,
+          id: { not: product.id },
+          categories: { some: { id: { in: categoryIds } } },
+        },
+        take: 4,
+        include: productListInclude,
+      })
+    : [];
 
   res.json({ success: true, product, related });
 });
@@ -132,11 +159,7 @@ const createProduct = asyncHandler(async (req, res) => {
     price,
     discountPrice,
     discountPercent,
-    categoryId,
     tags,
-    fabric,
-    fit,
-    occasion,
     careInstructions,
     isFeatured,
     isNewArrival,
@@ -145,8 +168,13 @@ const createProduct = asyncHandler(async (req, res) => {
     variants,
   } = req.body;
 
-  if (!name || !description || !price || !categoryId) {
-    throw new ApiError(400, 'name, description, price, and categoryId are required');
+  const categoryIds = toCategoryIds(req.body);
+
+  if (!name || !description || !price || categoryIds.length === 0) {
+    throw new ApiError(
+      400,
+      'name, description, price, and at least one category are required'
+    );
   }
 
   const slug = slugify(`${name}-${Date.now()}`, { lower: true, strict: true });
@@ -159,11 +187,11 @@ const createProduct = asyncHandler(async (req, res) => {
       price: Number(price),
       discountPrice: discountPrice ? Number(discountPrice) : null,
       discountPercent: discountPercent ? Number(discountPercent) : null,
-      categoryId,
+      categories: { connect: categoryIds.map((id) => ({ id })) },
       tags: Array.isArray(tags) ? tags : tags ? tags.split(',').map((t) => t.trim()) : [],
-      fabric,
-      fit,
-      occasion,
+      fabric: toStringArray(req.body.fabric),
+      fit: toStringArray(req.body.fit),
+      occasion: toStringArray(req.body.occasion),
       careInstructions,
       isFeatured: !!isFeatured,
       isNewArrival: !!isNewArrival,
@@ -196,6 +224,12 @@ const updateProduct = asyncHandler(async (req, res) => {
     data.tags = data.tags.split(',').map((t) => t.trim()).filter(Boolean);
   }
 
+  // Multi-value attributes — coerce to arrays only if present in the payload,
+  // so a partial update doesn't accidentally wipe them.
+  if ('fabric' in data) data.fabric = toStringArray(data.fabric);
+  if ('fit' in data) data.fit = toStringArray(data.fit);
+  if ('occasion' in data) data.occasion = toStringArray(data.occasion);
+
   // Normalize numeric fields. HTML inputs always arrive as strings, and an
   // empty string should become `null` for the nullable columns (discountPrice,
   // discountPercent) rather than NaN.
@@ -207,6 +241,19 @@ const updateProduct = asyncHandler(async (req, res) => {
   if ('discountPercent' in data) data.discountPercent = toNullableNumber(data.discountPercent);
   if (data.stock !== undefined && data.stock !== '') data.stock = Number(data.stock);
 
+  // Categories — `set` replaces the full join list. Only apply when the
+  // caller explicitly sends category info, so partial updates don't clear it.
+  let categoriesUpdate;
+  if ('categoryIds' in req.body || 'categoryId' in req.body) {
+    const ids = toCategoryIds(req.body);
+    if (ids.length === 0) {
+      throw new ApiError(400, 'At least one category is required');
+    }
+    categoriesUpdate = { set: ids.map((cid) => ({ id: cid })) };
+  }
+  delete data.categoryIds;
+  delete data.categoryId;
+
   // Strip fields that must not be updated through this generic path.
   delete data.id;
   delete data.slug;
@@ -215,6 +262,7 @@ const updateProduct = asyncHandler(async (req, res) => {
   delete data.avgRating;
   delete data.totalReviews;
   delete data.images;
+  delete data.categories;
   delete data.category;
 
   // Handle variants replacement if provided
@@ -236,7 +284,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     }
     return tx.product.update({
       where: { id },
-      data: rest,
+      data: { ...rest, ...(categoriesUpdate ? { categories: categoriesUpdate } : {}) },
       include: productInclude,
     });
   });
@@ -254,22 +302,50 @@ const deleteProduct = asyncHandler(async (req, res) => {
 
 // POST /api/admin/products/:id/images
 // Accepts either:
-//   - multipart/form-data with field name "images" (files), or
-//   - JSON body: { images: ["data:image/...;base64,..."] }
+//   - multipart/form-data with field name "images" (files) plus optional
+//     "color" and "isPrimary" fields, or
+//   - JSON body: { images: [{ url, color?, isPrimary? }] | ["data:image/..."] }
 const uploadImages = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  // Collect incoming image payloads from either upload path
-  let dataUrls = [];
+  // Normalise both upload paths into a list of { url, color, isPrimary } items.
+  let items = [];
   if (req.files?.length) {
-    dataUrls = req.files.map(fileToDataUrl).filter(Boolean);
+    // For multipart uploads `color` and `isPrimary` may be a single value
+    // (one file) or an array (one entry per file, same order).
+    const colors = [].concat(req.body?.color || []);
+    const primaries = [].concat(req.body?.isPrimary || []);
+    items = req.files
+      .map((file, idx) => {
+        const url = fileToDataUrl(file);
+        if (!url) return null;
+        return {
+          url,
+          color: colors[idx] || colors[0] || null,
+          isPrimary: String(primaries[idx] || primaries[0] || '') === 'true',
+        };
+      })
+      .filter(Boolean);
   } else if (Array.isArray(req.body?.images)) {
-    dataUrls = req.body.images.filter(
-      (u) => typeof u === 'string' && u.startsWith('data:image/')
-    );
+    items = req.body.images
+      .map((entry) => {
+        if (typeof entry === 'string' && entry.startsWith('data:image/')) {
+          return { url: entry, color: null, isPrimary: false };
+        }
+        if (entry && typeof entry === 'object' && typeof entry.url === 'string' &&
+            entry.url.startsWith('data:image/')) {
+          return {
+            url: entry.url,
+            color: entry.color || null,
+            isPrimary: !!entry.isPrimary,
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
   }
 
-  if (dataUrls.length === 0) throw new ApiError(400, 'No images uploaded');
+  if (items.length === 0) throw new ApiError(400, 'No images uploaded');
 
   const product = await prisma.product.findUnique({
     where: { id },
@@ -278,19 +354,34 @@ const uploadImages = asyncHandler(async (req, res) => {
   if (!product) throw new ApiError(404, 'Product not found');
 
   const existing = await prisma.productImage.count({ where: { productId: id } });
+  // Only one primary per product. If the caller marked one as primary, demote
+  // any current primary first.
+  const newPrimary = items.find((it) => it.isPrimary);
+  const promoteFirst = !newPrimary && existing === 0;
 
-  const created = await prisma.$transaction(
-    dataUrls.map((url, idx) =>
-      prisma.productImage.create({
+  const created = await prisma.$transaction(async (tx) => {
+    if (newPrimary) {
+      await tx.productImage.updateMany({
+        where: { productId: id, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+    const rows = [];
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      const row = await tx.productImage.create({
         data: {
           productId: id,
-          url,
-          isPrimary: existing === 0 && idx === 0,
+          url: item.url,
+          color: item.color || null,
+          isPrimary: item.isPrimary || (promoteFirst && idx === 0),
           order: existing + idx,
         },
-      })
-    )
-  );
+      });
+      rows.push(row);
+    }
+    return rows;
+  });
 
   res.json({ success: true, images: created });
 });

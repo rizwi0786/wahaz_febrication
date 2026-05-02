@@ -75,32 +75,31 @@ model Category {
   image       String?   @db.Text // base64 data URL or remote URL
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
-  products    Product[]
+  products    Product[] @relation("ProductCategories")
 }
 
 model Product {
-  id               String   @id @default(uuid())
+  id               String     @id @default(uuid())
   name             String
-  slug             String   @unique
+  slug             String     @unique
   description      String
-  price            Decimal  @db.Decimal(10, 2)
-  discountPrice    Decimal? @db.Decimal(10, 2)
+  price            Decimal    @db.Decimal(10, 2)
+  discountPrice    Decimal?   @db.Decimal(10, 2)
   discountPercent  Int?
-  categoryId       String
-  category         Category @relation(fields: [categoryId], references: [id])
+  categories       Category[] @relation("ProductCategories")
   tags             String[]
-  fabric           String?
-  fit              String?
-  occasion         String?
+  fabric           String[]   @default([])
+  fit              String[]   @default([])
+  occasion         String[]   @default([])
   careInstructions String?
-  isFeatured       Boolean  @default(false)
-  isNewArrival     Boolean  @default(false)
-  isActive         Boolean  @default(true)
-  stock            Int      @default(0)
-  avgRating        Decimal  @default(0) @db.Decimal(3, 2)
-  totalReviews     Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  isFeatured       Boolean    @default(false)
+  isNewArrival     Boolean    @default(false)
+  isActive         Boolean    @default(true)
+  stock            Int        @default(0)
+  avgRating        Decimal    @default(0) @db.Decimal(3, 2)
+  totalReviews     Int        @default(0)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   images     ProductImage[]
   variants   ProductVariant[]
@@ -109,7 +108,6 @@ model Product {
   cartItems  CartItem[]
   orderItems OrderItem[]
 
-  @@index([categoryId])
   @@index([slug])
   @@index([isActive, isFeatured])
 }
@@ -120,9 +118,13 @@ model ProductImage {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   url       String  @db.Text // base64 data URL or remote URL
   isPrimary Boolean @default(false)
+  // When set, this image is shown only when the customer selects this color
+  // variant. Null images act as the default gallery for the product.
+  color     String?
   order     Int     @default(0)
 
   @@index([productId])
+  @@index([productId, color])
 }
 
 model ProductVariant {

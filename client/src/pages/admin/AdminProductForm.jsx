@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Plus, Trash2 } from 'lucide-react';
@@ -11,7 +11,13 @@ import {
 } from '../../store/api/adminApi';
 import { useListCategoriesQuery } from '../../store/api/productApi';
 import Button from '../../components/common/Button';
-import Input, { Textarea, Select } from '../../components/common/Input';
+import Input, { Textarea } from '../../components/common/Input';
+
+// Catalog-wide option lists. These mirror the customer-facing filter so that
+// admin selections always match the values customers can filter against.
+const FABRIC_OPTIONS = ['Cotton', 'Wool', 'Silk', 'Linen', 'Polyester', 'Velvet', 'Denim'];
+const FIT_OPTIONS = ['Slim Fit', 'Regular Fit', 'Tailored Fit', 'Relaxed Fit', 'Oversized'];
+const OCCASION_OPTIONS = ['Formal', 'Casual', 'Wedding', 'Party', 'Festive', 'Office'];
 
 // Derived discounted price from price + percent. Returns '' for any
 // non-positive / invalid input so the form field stays empty instead
@@ -31,17 +37,88 @@ const EMPTY = {
   price: '',
   discountPrice: '',
   discountPercent: '',
-  categoryId: '',
+  categoryIds: [],
   tags: '',
-  fabric: '',
-  fit: '',
-  occasion: '',
+  fabric: [],
+  fit: [],
+  occasion: [],
   careInstructions: '',
   isFeatured: false,
   isNewArrival: false,
   isActive: true,
   stock: 0,
 };
+
+// Small pill-style multi-select. Clicking a chip toggles its inclusion.
+function ChipMultiSelect({ options, selected, onChange, allowCustom = false }) {
+  const [draft, setDraft] = useState('');
+  const toggle = (val) => {
+    const next = selected.includes(val)
+      ? selected.filter((s) => s !== val)
+      : [...selected, val];
+    onChange(next);
+  };
+  const addCustom = () => {
+    const v = draft.trim();
+    if (!v) return;
+    if (!selected.includes(v)) onChange([...selected, v]);
+    setDraft('');
+  };
+  const customSelected = selected.filter((s) => !options.includes(s));
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => toggle(opt)}
+            className={`px-3 py-1.5 text-xs border rounded-full transition ${
+              selected.includes(opt)
+                ? 'bg-brand-primary text-white border-brand-primary'
+                : 'border-gray-300 hover:border-brand-primary'
+            }`}
+          >
+            {opt}
+          </button>
+        ))}
+        {customSelected.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => toggle(opt)}
+            className="px-3 py-1.5 text-xs border rounded-full bg-brand-primary text-white border-brand-primary"
+          >
+            {opt} ×
+          </button>
+        ))}
+      </div>
+      {allowCustom && (
+        <div className="flex gap-2 mt-2">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addCustom();
+              }
+            }}
+            placeholder="Add custom value"
+            className="input py-1.5 text-xs flex-1"
+          />
+          <button
+            type="button"
+            onClick={addCustom}
+            className="text-xs px-3 py-1.5 border border-gray-300 rounded hover:border-brand-primary"
+          >
+            Add
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminProductForm({ mode = 'create' }) {
   const { id } = useParams();
@@ -56,7 +133,9 @@ export default function AdminProductForm({ mode = 'create' }) {
 
   const [form, setForm] = useState(EMPTY);
   const [variants, setVariants] = useState([EMPTY_VARIANT]);
-  const [imageFiles, setImageFiles] = useState([]);
+  // Pending image uploads — { color: string|null, files: File[] }
+  // `null` color = the default product gallery (used when no color is selected)
+  const [pendingUploads, setPendingUploads] = useState({ default: [] });
 
   useEffect(() => {
     if (mode === 'edit' && productData?.product) {
@@ -70,17 +149,20 @@ export default function AdminProductForm({ mode = 'create' }) {
         );
         if (inferred > 0 && inferred < 100) percent = inferred;
       }
+      // Multi-attribute fields may arrive as arrays (new schema) or as a
+      // single string (rows seeded before the migration).
+      const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
       setForm({
         name: p.name,
         description: p.description,
         price: p.price,
         discountPercent: percent,
         discountPrice: calcDiscountPrice(p.price, percent),
-        categoryId: p.categoryId,
+        categoryIds: (p.categories || []).map((c) => c.id),
         tags: p.tags?.join(', ') || '',
-        fabric: p.fabric || '',
-        fit: p.fit || '',
-        occasion: p.occasion || '',
+        fabric: asArray(p.fabric),
+        fit: asArray(p.fit),
+        occasion: asArray(p.occasion),
         careInstructions: p.careInstructions || '',
         isFeatured: p.isFeatured,
         isNewArrival: p.isNewArrival,
@@ -102,12 +184,43 @@ export default function AdminProductForm({ mode = 'create' }) {
   };
   const removeVariant = (i) => setVariants(variants.filter((_, j) => j !== i));
 
+  const toggleCategory = (cid) => {
+    setForm((f) => ({
+      ...f,
+      categoryIds: f.categoryIds.includes(cid)
+        ? f.categoryIds.filter((x) => x !== cid)
+        : [...f.categoryIds, cid],
+    }));
+  };
+
+  // Distinct color names declared on the variants list. Per-color image
+  // sections appear once per color so admins can attach a tailored gallery.
+  const distinctColors = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    for (const v of variants) {
+      const c = (v.color || '').trim();
+      if (c && !seen.has(c)) {
+        seen.add(c);
+        out.push(c);
+      }
+    }
+    return out;
+  }, [variants]);
+
+  const setUploadFiles = (key, files) => {
+    setPendingUploads((u) => ({ ...u, [key]: Array.from(files || []) }));
+  };
+
   const handleSubmit = async () => {
-    if (!form.name || !form.description || !form.price || !form.categoryId) {
-      return toast.error('Name, description, price, and category are required');
+    if (!form.name || !form.description || !form.price || form.categoryIds.length === 0) {
+      return toast.error('Name, description, price, and at least one category are required');
     }
     try {
-      const payload = { ...form, variants: variants.filter((v) => v.size && v.color) };
+      const payload = {
+        ...form,
+        variants: variants.filter((v) => v.size && v.color),
+      };
       let productId = id;
       if (mode === 'create') {
         const res = await createProduct(payload).unwrap();
@@ -118,11 +231,21 @@ export default function AdminProductForm({ mode = 'create' }) {
         toast.success('Product updated');
       }
 
-      // Upload new images
-      if (imageFiles.length > 0 && productId) {
-        const fd = new FormData();
-        imageFiles.forEach((f) => fd.append('images', f));
-        await uploadImages({ id: productId, formData: fd }).unwrap();
+      // Upload any pending image batches. Each batch is tagged with its
+      // colour (or null for the shared default gallery) so the server can
+      // store it on the right slot.
+      if (productId) {
+        const batches = Object.entries(pendingUploads).filter(
+          ([, files]) => files && files.length > 0
+        );
+        for (const [key, files] of batches) {
+          const fd = new FormData();
+          files.forEach((f) => {
+            fd.append('images', f);
+            fd.append('color', key === 'default' ? '' : key);
+          });
+          await uploadImages({ id: productId, formData: fd }).unwrap();
+        }
       }
 
       navigate('/admin/products');
@@ -130,6 +253,18 @@ export default function AdminProductForm({ mode = 'create' }) {
       toast.error(err?.data?.message || 'Save failed');
     }
   };
+
+  // Group existing images by color (null → 'default') so they can be shown
+  // alongside the matching upload box.
+  const imagesByColor = useMemo(() => {
+    const groups = { default: [] };
+    for (const img of existingImages) {
+      const k = img.color || 'default';
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(img);
+    }
+    return groups;
+  }, [existingImages]);
 
   return (
     <div>
@@ -257,41 +392,72 @@ export default function AdminProductForm({ mode = 'create' }) {
           </div>
 
           <div className="bg-white rounded-lg p-6 border">
-            <h3 className="font-serif text-lg mb-4">Images</h3>
-            {existingImages.length > 0 && (
-              <div className="grid grid-cols-5 gap-3 mb-4">
-                {existingImages.map((img) => (
-                  <div key={img.id} className="relative group">
-                    <img src={img.url} alt="" className="w-full aspect-square object-cover rounded" />
-                    <button
-                      onClick={() => deleteImage({ id, imageId: img.id })}
-                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={(e) => setImageFiles(Array.from(e.target.files || []))}
-              className="text-sm"
+            <h3 className="font-serif text-lg mb-1">Images</h3>
+            <p className="text-xs text-brand-muted mb-4">
+              The default gallery shows when no color is selected. Add a color in
+              Variants to upload color-specific photos.
+            </p>
+
+            {/* Default (no-color) gallery */}
+            <ImageGroup
+              label="Default gallery"
+              hint="Shown on the product card and as the fallback gallery."
+              existing={imagesByColor.default || []}
+              files={pendingUploads.default || []}
+              onPick={(files) => setUploadFiles('default', files)}
+              onDelete={(imageId) => deleteImage({ id, imageId })}
             />
-            {imageFiles.length > 0 && (
-              <p className="text-xs text-brand-muted mt-2">{imageFiles.length} new file(s) ready to upload</p>
-            )}
+
+            {/* Per-color galleries — one block per distinct variant color */}
+            {distinctColors.map((color) => (
+              <div key={color} className="mt-6 pt-6 border-t">
+                <ImageGroup
+                  label={`Photos for color: ${color}`}
+                  hint={`Shown when a customer picks "${color}" on the product page.`}
+                  existing={imagesByColor[color] || []}
+                  files={pendingUploads[color] || []}
+                  onPick={(files) => setUploadFiles(color, files)}
+                  onDelete={(imageId) => deleteImage({ id, imageId })}
+                />
+              </div>
+            ))}
           </div>
 
           <div className="bg-white rounded-lg p-6 border">
             <h3 className="font-serif text-lg mb-4">Product Details</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="Fabric" value={form.fabric} onChange={(e) => setForm({ ...form, fabric: e.target.value })} />
-              <Input label="Fit" value={form.fit} onChange={(e) => setForm({ ...form, fit: e.target.value })} />
-              <Input label="Occasion" value={form.occasion} onChange={(e) => setForm({ ...form, occasion: e.target.value })} />
-              <Input label="Tags (comma separated)" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} />
+            <div className="space-y-4">
+              <div>
+                <label className="label">Fabric</label>
+                <ChipMultiSelect
+                  options={FABRIC_OPTIONS}
+                  selected={form.fabric}
+                  onChange={(next) => setForm({ ...form, fabric: next })}
+                  allowCustom
+                />
+              </div>
+              <div>
+                <label className="label">Fit</label>
+                <ChipMultiSelect
+                  options={FIT_OPTIONS}
+                  selected={form.fit}
+                  onChange={(next) => setForm({ ...form, fit: next })}
+                  allowCustom
+                />
+              </div>
+              <div>
+                <label className="label">Occasion</label>
+                <ChipMultiSelect
+                  options={OCCASION_OPTIONS}
+                  selected={form.occasion}
+                  onChange={(next) => setForm({ ...form, occasion: next })}
+                  allowCustom
+                />
+              </div>
+              <Input
+                label="Tags (comma separated)"
+                value={form.tags}
+                onChange={(e) => setForm({ ...form, tags: e.target.value })}
+              />
             </div>
             <Textarea
               label="Care instructions"
@@ -305,23 +471,31 @@ export default function AdminProductForm({ mode = 'create' }) {
 
         <div className="space-y-6">
           <div className="bg-white rounded-lg p-6 border">
-            <h3 className="font-serif text-lg mb-4">Organization</h3>
-            <Select
-              label="Category"
-              value={form.categoryId}
-              onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-            >
-              <option value="">Select category</option>
+            <h3 className="font-serif text-lg mb-2">Categories</h3>
+            <p className="text-xs text-brand-muted mb-3">
+              Pick one or more — products can live in multiple categories.
+            </p>
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.categoryIds.includes(c.id)}
+                    onChange={() => toggleCategory(c.id)}
+                  />
+                  {c.name}
+                </label>
               ))}
-            </Select>
+              {categories.length === 0 && (
+                <p className="text-xs text-brand-muted">No categories yet.</p>
+              )}
+            </div>
             <Input
               label="Stock"
               type="number"
               value={form.stock}
               onChange={(e) => setForm({ ...form, stock: e.target.value })}
-              className="mt-3"
+              className="mt-4"
             />
           </div>
 
@@ -363,6 +537,49 @@ export default function AdminProductForm({ mode = 'create' }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ImageGroup({ label, hint, existing, files, onPick, onDelete }) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <h4 className="text-sm font-medium">{label}</h4>
+        <span className="text-xs text-brand-muted">{existing.length} saved</span>
+      </div>
+      {hint && <p className="text-xs text-brand-muted mb-3">{hint}</p>}
+      {existing.length > 0 && (
+        <div className="grid grid-cols-5 gap-3 mb-3">
+          {existing.map((img) => (
+            <div key={img.id} className="relative group">
+              <img src={img.url} alt="" className="w-full aspect-square object-cover rounded" />
+              {img.isPrimary && (
+                <span className="absolute bottom-1 left-1 text-[10px] bg-brand-primary text-white px-1.5 py-0.5 rounded">
+                  Primary
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => onDelete(img.id)}
+                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <input
+        type="file"
+        multiple
+        accept="image/*"
+        onChange={(e) => onPick(e.target.files)}
+        className="text-sm"
+      />
+      {files.length > 0 && (
+        <p className="text-xs text-brand-muted mt-2">{files.length} new file(s) ready to upload</p>
+      )}
     </div>
   );
 }

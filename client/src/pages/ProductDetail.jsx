@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Heart, Share2, Star, Truck, ShieldCheck, RefreshCw, Plus, Minus } from 'lucide-react';
@@ -49,6 +49,24 @@ export default function ProductDetail() {
     return product?.variants?.find((v) => v.color === selectedColor && v.size === selectedSize);
   }, [product, selectedColor, selectedSize]);
 
+  // When the customer picks a color, prefer the per-color image set; fall
+  // back to the default (no-color) gallery if the admin didn't upload any.
+  const galleryImages = useMemo(() => {
+    if (!product?.images?.length) return [];
+    if (selectedColor) {
+      const byColor = product.images.filter((img) => img.color === selectedColor);
+      if (byColor.length > 0) return byColor;
+    }
+    const noColor = product.images.filter((img) => !img.color);
+    return noColor.length > 0 ? noColor : product.images;
+  }, [product, selectedColor]);
+
+  // Reset the active thumbnail whenever the gallery changes so we don't end
+  // up indexing past the new array.
+  useEffect(() => {
+    setSelectedImage(0);
+  }, [galleryImages]);
+
   if (isLoading) return <Loader className="py-24" size="lg" />;
   if (!product) return <p className="text-center py-24">Product not found</p>;
 
@@ -98,13 +116,18 @@ export default function ProductDetail() {
 
   return (
     <div className="section py-8">
-      <nav className="text-xs text-brand-muted mb-6">
+      <nav className="text-xs text-brand-muted mb-6 flex flex-wrap items-center gap-x-1">
         <Link to="/" className="hover:text-brand-primary">Home</Link> /{' '}
-        <Link to="/shop" className="hover:text-brand-primary">Shop</Link> /{' '}
-        <Link to={`/shop?category=${product.category?.slug}`} className="hover:text-brand-primary">
-          {product.category?.name}
-        </Link>{' '}
-        / <span className="text-brand-primary">{product.name}</span>
+        <Link to="/shop" className="hover:text-brand-primary">Shop</Link>
+        {product.categories?.map((c) => (
+          <span key={c.id} className="flex items-center gap-x-1">
+            /{' '}
+            <Link to={`/shop?category=${c.slug}`} className="hover:text-brand-primary">
+              {c.name}
+            </Link>
+          </span>
+        ))}
+        {' '}/ <span className="text-brand-primary">{product.name}</span>
       </nav>
 
       <div className="grid md:grid-cols-2 gap-6 md:gap-10">
@@ -112,13 +135,13 @@ export default function ProductDetail() {
         <div>
           <div className="bg-gray-100 rounded-lg overflow-hidden aspect-[4/5] mb-4">
             <img
-              src={product.images?.[selectedImage]?.url}
+              src={galleryImages[selectedImage]?.url}
               alt={product.name}
               className="w-full h-full object-cover"
             />
           </div>
           <div className="flex gap-3 overflow-x-auto scrollbar-none">
-            {product.images?.map((img, i) => (
+            {galleryImages.map((img, i) => (
               <button
                 key={img.id}
                 onClick={() => setSelectedImage(i)}
@@ -261,9 +284,15 @@ export default function ProductDetail() {
 
           {/* Highlights */}
           <div className="grid grid-cols-2 gap-3 text-sm border-t pt-6">
-            {product.fabric && <div><span className="text-brand-muted">Fabric: </span>{product.fabric}</div>}
-            {product.fit && <div><span className="text-brand-muted">Fit: </span>{product.fit}</div>}
-            {product.occasion && <div><span className="text-brand-muted">Occasion: </span>{product.occasion}</div>}
+            {product.fabric?.length > 0 && (
+              <div><span className="text-brand-muted">Fabric: </span>{product.fabric.join(', ')}</div>
+            )}
+            {product.fit?.length > 0 && (
+              <div><span className="text-brand-muted">Fit: </span>{product.fit.join(', ')}</div>
+            )}
+            {product.occasion?.length > 0 && (
+              <div><span className="text-brand-muted">Occasion: </span>{product.occasion.join(', ')}</div>
+            )}
             {product.careInstructions && (
               <div><span className="text-brand-muted">Care: </span>{product.careInstructions}</div>
             )}

@@ -48,9 +48,9 @@ function buildProducts(category, index) {
     price,
     discountPrice,
     discountPercent: discountPercent || null,
-    fabric: ['Cotton', 'Wool', 'Silk', 'Linen'][index % 4],
-    fit: ['Slim Fit', 'Regular Fit', 'Tailored Fit'][index % 3],
-    occasion: ['Formal', 'Casual', 'Wedding', 'Party'][index % 4],
+    fabric: [['Cotton', 'Wool', 'Silk', 'Linen'][index % 4]],
+    fit: [['Slim Fit', 'Regular Fit', 'Tailored Fit'][index % 3]],
+    occasion: [['Formal', 'Casual', 'Wedding', 'Party'][index % 4]],
     careInstructions: 'Dry clean only. Iron on low heat.',
     tags: ['new', 'trending'],
     stock: 50,
@@ -103,7 +103,7 @@ async function main() {
       await prisma.product.create({
         data: {
           ...data,
-          categoryId: category.id,
+          categories: { connect: [{ id: category.id }] },
           images: {
             create: [
               { url: placeholderImage(`${data.slug}-1`), isPrimary: true, order: 0 },

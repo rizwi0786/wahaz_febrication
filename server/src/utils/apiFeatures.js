@@ -29,7 +29,8 @@ function buildProductQuery(query) {
   const andFilters = [];
 
   if (category) {
-    where.category = { slug: category };
+    const slugs = Array.isArray(category) ? category : category.split(',');
+    where.categories = { some: { slug: { in: slugs } } };
   }
 
   if (minPrice || maxPrice) {
@@ -38,14 +39,16 @@ function buildProductQuery(query) {
     if (maxPrice) where.price.lte = Number(maxPrice);
   }
 
+  // occasion / fabric are now String[] columns — `hasSome` matches any row
+  // whose array overlaps the requested filter list.
   if (occasion) {
     const list = Array.isArray(occasion) ? occasion : occasion.split(',');
-    where.occasion = { in: list };
+    where.occasion = { hasSome: list };
   }
 
   if (fabric) {
     const list = Array.isArray(fabric) ? fabric : fabric.split(',');
-    where.fabric = { in: list };
+    where.fabric = { hasSome: list };
   }
 
   if (rating) {

@@ -74,7 +74,9 @@ export default function AdminProducts() {
                     />
                   </td>
                   <td className="px-4 py-3 font-medium">{p.name}</td>
-                  <td className="px-4 py-3 text-xs">{p.category?.name}</td>
+                  <td className="px-4 py-3 text-xs">
+                    {p.categories?.map((c) => c.name).join(', ') || '—'}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     {formatCurrency(p.discountPrice || p.price)}
                   </td>

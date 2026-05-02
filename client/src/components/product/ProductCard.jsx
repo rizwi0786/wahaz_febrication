@@ -65,7 +65,7 @@ export default function ProductCard({ product }) {
 
       <div className="pt-3 space-y-1">
         <h3 className="text-sm font-medium text-brand-primary line-clamp-1">{product.name}</h3>
-        <p className="text-xs text-brand-muted capitalize">{product.category?.name}</p>
+        <p className="text-xs text-brand-muted capitalize">{product.categories?.[0]?.name}</p>
         <div className="flex items-center gap-2">
           {hasDiscount ? (
             <>
