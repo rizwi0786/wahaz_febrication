@@ -11,7 +11,11 @@ import { useGetProfileQuery, useAddAddressMutation } from '../store/api/userApi'
 import { usePlaceOrderMutation, useVerifyPaymentMutation } from '../store/api/orderApi';
 import { openRazorpayCheckout } from '../utils/razorpay';
 import Button from '../components/common/Button';
-import Input, { Select } from '../components/common/Input';
+import Input, { Select, Textarea } from '../components/common/Input';
+import SizeChartModal from '../components/product/SizeChartModal';
+import { Ruler } from 'lucide-react';
+
+const FIT_OPTIONS = ['Slim Fit', 'Regular Fit', 'Tailored Fit', 'Relaxed Fit', 'Classic Fit'];
 import Loader from '../components/common/Loader';
 import { formatCurrency } from '../utils/format';
 import { selectCurrentUser } from '../store/slices/authSlice';
@@ -28,7 +32,8 @@ export default function Checkout() {
   const [addAddress] = useAddAddressMutation();
   const [validateCoupon] = useValidateCouponMutation();
   const [placeOrder, { isLoading: placing }] = usePlaceOrderMutation();
-  const [verifyPayment] = useVerifyPaymentMutation();
+  const [verifyPayment, { isLoading: verifying }] = useVerifyPaymentMutation();
+  const [paying, setPaying] = useState(false);
 
   const [step, setStep] = useState(0);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
@@ -46,6 +51,9 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState('RAZORPAY');
   const [couponCode, setCouponCode] = useState(location.state?.couponCode || '');
   const [coupon, setCoupon] = useState(null);
+  const [fitPreference, setFitPreference] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
 
   if (cartLoading) return <Loader className="py-24" size="lg" />;
 
@@ -89,14 +97,18 @@ export default function Checkout() {
   };
 
   const handlePlaceOrder = async () => {
+    if (paying || placing || verifying) return; // guard against double-click
     const address = selectedAddress || (showNewAddress ? newAddress : null);
     if (!address) return toast.error('Please add or select an address');
 
+    setPaying(true);
     try {
       const result = await placeOrder({
         shippingAddress: address,
         paymentMethod,
         couponCode: coupon?.code,
+        fitPreference: fitPreference || undefined,
+        notes: orderNotes || undefined,
       }).unwrap();
 
       if (paymentMethod === 'COD') {
@@ -105,7 +117,8 @@ export default function Checkout() {
         return;
       }
 
-      // Razorpay flow
+      // Razorpay flow. Amount/currency are echoed back from the server's
+      // razorpay.orders.create response — never trust a client-computed total.
       await openRazorpayCheckout({
         razorpayOrderId: result.razorpay.razorpayOrderId,
         amount: result.razorpay.amount,
@@ -124,11 +137,17 @@ export default function Checkout() {
             navigate(`/order-success/${result.order.id}`);
           } catch (err) {
             toast.error(err?.data?.message || 'Payment verification failed');
+          } finally {
+            setPaying(false);
           }
         },
-        onDismiss: () => toast.error('Payment cancelled'),
+        onDismiss: () => {
+          setPaying(false);
+          toast.error('Payment cancelled');
+        },
       });
     } catch (err) {
+      setPaying(false);
       toast.error(err?.data?.message || 'Failed to place order');
     }
   };
@@ -301,6 +320,43 @@ export default function Checkout() {
                 ))}
               </div>
 
+              <div className="mb-4 border-t pt-4">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <label className="label">Fit preference (optional)</label>
+                    <p className="text-xs text-brand-muted">
+                      How would you like the garment to be tailored?
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSizeChartOpen(true)}
+                    className="text-xs flex items-center gap-1 text-brand-secondary hover:underline shrink-0"
+                  >
+                    <Ruler size={14} /> Size chart
+                  </button>
+                </div>
+                <Select
+                  value={fitPreference}
+                  onChange={(e) => setFitPreference(e.target.value)}
+                >
+                  <option value="">No preference</option>
+                  {FIT_OPTIONS.map((f) => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="mb-4">
+                <Textarea
+                  label="Notes / instructions for the tailor (optional)"
+                  rows={3}
+                  value={orderNotes}
+                  onChange={(e) => setOrderNotes(e.target.value)}
+                  placeholder="e.g. need by a specific date, special handling, gift wrap, etc."
+                />
+              </div>
+
               <div className="mb-4">
                 <label className="label">Coupon</label>
                 <div className="flex gap-2">
@@ -361,7 +417,11 @@ export default function Checkout() {
               </div>
               <div className="flex justify-between mt-6">
                 <Button onClick={() => setStep(1)} variant="ghost">← Back</Button>
-                <Button onClick={handlePlaceOrder} loading={placing}>
+                <Button
+                  onClick={handlePlaceOrder}
+                  loading={placing || paying || verifying}
+                  disabled={placing || paying || verifying}
+                >
                   Place Order
                 </Button>
               </div>
@@ -398,6 +458,12 @@ export default function Checkout() {
           </div>
         </div>
       </div>
+
+      <SizeChartModal
+        open={sizeChartOpen}
+        onClose={() => setSizeChartOpen(false)}
+        productFits={fitPreference ? [fitPreference] : []}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-# Wahaz Fabrication
+# Bellissimo Couture
 
 Premium men's designer fashion e-commerce platform. Full-stack application with a customer storefront, admin panel, Razorpay payments, and JWT authentication.
 
@@ -21,7 +21,7 @@ Premium men's designer fashion e-commerce platform. Full-stack application with 
 ## Project Structure
 
 ```
-wahaz_febrication/
+bellissimo_couture/
 ├── server/                        # Express backend
 │   ├── prisma/
 │   │   ├── schema.prisma          # Database schema (13 models)
@@ -105,8 +105,8 @@ wahaz_febrication/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/rizwi0786/wahaz_febrication.git
-cd wahaz_febrication
+git clone https://github.com/rizwi0786/bellissimo_couture.git
+cd bellissimo_couture
 ```
 
 ### 2. Setup the backend
@@ -150,7 +150,7 @@ npm run dev
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | `admin@wahazfabrication.com` | `Admin@123` |
+| Admin | `admin@bellissimocouture.com` | `Admin@123` |
 
 ---
 

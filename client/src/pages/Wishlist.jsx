@@ -55,22 +55,36 @@ export default function Wishlist() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
         {items.map((item) => {
           const price = Number(item.product.discountPrice || item.product.price);
+          const unavailable = !item.product?.isActive;
           return (
-            <div key={item.id} className="card overflow-hidden group">
+            <div key={item.id} className={`card overflow-hidden group ${unavailable ? 'opacity-60' : ''}`}>
               <Link to={`/product/${item.product.slug}`} className="block relative aspect-[4/5] bg-gray-100">
                 <img
                   src={item.product.images?.[0]?.url}
                   alt={item.product.name}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
+                {unavailable && (
+                  <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-medium px-2 py-1 rounded">
+                    Unavailable
+                  </span>
+                )}
               </Link>
               <div className="p-4">
                 <Link to={`/product/${item.product.slug}`} className="text-sm font-medium hover:text-brand-secondary line-clamp-1">
                   {item.product.name}
                 </Link>
                 <p className="font-semibold mt-1">{formatCurrency(price)}</p>
+                {unavailable && (
+                  <p className="text-xs text-red-600 mt-1">No longer available</p>
+                )}
                 <div className="flex gap-2 mt-3">
-                  <Button size="sm" onClick={() => handleMoveToCart(item)} className="flex-1">
+                  <Button
+                    size="sm"
+                    onClick={() => handleMoveToCart(item)}
+                    disabled={unavailable}
+                    className="flex-1"
+                  >
                     Move to cart
                   </Button>
                   <button

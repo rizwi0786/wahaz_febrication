@@ -9,8 +9,8 @@ const COLORS = [
   { name: 'White', hex: '#FFFFFF' },
   { name: 'Maroon', hex: '#800000' },
 ];
-const OCCASIONS = ['Formal', 'Casual', 'Wedding', 'Party', 'Festive'];
-const FABRICS = ['Cotton', 'Wool', 'Silk', 'Linen', 'Polyester'];
+const OCCASIONS = ['Formal', 'Casual', 'Wedding', 'Party', 'Business', 'Festive', 'Seasonal', 'High-End', 'Traditional', 'Cocktail'];
+const FABRICS = ['Cotton', 'Wool', 'Silk', 'Linen', 'Polyester', 'Velvet', 'Tweed', 'Cashmere', 'Satin', 'Brocade'];
 
 export default function ProductFilter({ filters, setFilters }) {
   const { data: catData } = useListCategoriesQuery();

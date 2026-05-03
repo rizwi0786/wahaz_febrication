@@ -31,6 +31,17 @@ import AdminCategories from './pages/admin/AdminCategories';
 import AdminCoupons from './pages/admin/AdminCoupons';
 import AdminBanners from './pages/admin/AdminBanners';
 import AdminReviews from './pages/admin/AdminReviews';
+import AdminCustomOrders from './pages/admin/AdminCustomOrders';
+import AdminCustomOrderDetail from './pages/admin/AdminCustomOrderDetail';
+
+import CustomOrderNew from './pages/CustomOrderNew';
+import MyCustomOrders from './pages/MyCustomOrders';
+import CustomOrderDetail from './pages/CustomOrderDetail';
+
+import Services from './pages/Services';
+import ScheduleSession from './pages/ScheduleSession';
+import VisitStudio from './pages/VisitStudio';
+import AdminConsultations from './pages/admin/AdminConsultations';
 
 import { useAuthBootstrap } from './hooks/useAuthBootstrap';
 
@@ -54,6 +65,11 @@ export default function App() {
         <Route path="product/:slug" element={<ProductDetail />} />
         <Route path="cart" element={<Cart />} />
 
+        {/* Services hub */}
+        <Route path="services" element={<Services />} />
+        <Route path="services/schedule" element={<ScheduleSession />} />
+        <Route path="services/studio" element={<VisitStudio />} />
+
         {/* Auth (public) */}
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
@@ -67,6 +83,9 @@ export default function App() {
         <Route path="orders/:id" element={<ProtectedRoute><OrderTracking /></ProtectedRoute>} />
         <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
+        <Route path="custom-orders" element={<ProtectedRoute><MyCustomOrders /></ProtectedRoute>} />
+        <Route path="custom-orders/new" element={<ProtectedRoute><CustomOrderNew /></ProtectedRoute>} />
+        <Route path="custom-orders/:id" element={<ProtectedRoute><CustomOrderDetail /></ProtectedRoute>} />
       </Route>
 
       {/* Admin */}
@@ -82,6 +101,9 @@ export default function App() {
         <Route path="coupons" element={<AdminCoupons />} />
         <Route path="banners" element={<AdminBanners />} />
         <Route path="reviews" element={<AdminReviews />} />
+        <Route path="custom-orders" element={<AdminCustomOrders />} />
+        <Route path="consultations" element={<AdminConsultations />} />
+        <Route path="custom-orders/:id" element={<AdminCustomOrderDetail />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

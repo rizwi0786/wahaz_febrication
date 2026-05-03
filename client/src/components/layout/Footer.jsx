@@ -1,16 +1,20 @@
 import { Link } from 'react-router-dom';
-import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from 'lucide-react';
+import { Facebook, Instagram, Twitter, Mail, Phone, MapPin, MessageCircle } from 'lucide-react';
+import {
+  CONTACT_EMAIL,
+  CONTACT_PHONE_DISPLAY,
+  CONTACT_PHONE_TEL,
+  CONTACT_WHATSAPP,
+} from '../../config/contact';
 
 export default function Footer() {
   return (
     <footer className="bg-brand-primary text-white mt-20">
       <div className="section py-14 grid grid-cols-1 md:grid-cols-4 gap-10">
         <div>
-          <h3 className="font-serif text-2xl mb-4">
-            Wahaz <span className="text-brand-secondary">Fabrication</span>
-          </h3>
+          <img src="/logo.png" alt="Bellissimo Couture" className="h-14 w-auto mb-4 brightness-200" />
           <p className="text-sm text-white/70 leading-relaxed">
-            Premium designer menswear crafted for the modern gentleman. Tailored fits, refined fabrics.
+            Designer Attire. Timeless Impression. Blending Italian finesse with royal heritage.
           </p>
           <div className="flex gap-3 mt-4">
             <a href="#" className="hover:text-brand-secondary"><Facebook size={18} /></a>
@@ -33,11 +37,10 @@ export default function Footer() {
         <div>
           <h4 className="font-medium mb-4 text-brand-secondary">Company</h4>
           <ul className="space-y-2 text-sm text-white/70">
-            <li>About us</li>
-            <li>Contact</li>
-            <li>Shipping & Returns</li>
-            <li>Size Guide</li>
-            <li>FAQ</li>
+            <li><Link to="/services" className="hover:text-white">Our Services</Link></li>
+            <li><Link to="/services/schedule" className="hover:text-white">Schedule a session</Link></li>
+            <li><Link to="/services/studio" className="hover:text-white">Visit our studio</Link></li>
+            <li><Link to="/custom-orders/new" className="hover:text-white">Custom Design</Link></li>
           </ul>
         </div>
 
@@ -48,10 +51,23 @@ export default function Footer() {
               <MapPin size={16} className="mt-0.5 shrink-0" /> New Delhi, India
             </li>
             <li className="flex items-center gap-2">
-              <Phone size={16} /> +91 98765 43210
+              <Phone size={16} />
+              <a href={`tel:${CONTACT_PHONE_TEL}`} className="hover:text-white">{CONTACT_PHONE_DISPLAY}</a>
             </li>
             <li className="flex items-center gap-2">
-              <Mail size={16} /> hello@wahazfabrication.com
+              <MessageCircle size={16} />
+              <a
+                href={`https://wa.me/${CONTACT_WHATSAPP}`}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-white"
+              >
+                WhatsApp
+              </a>
+            </li>
+            <li className="flex items-center gap-2">
+              <Mail size={16} />
+              <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-white break-all">{CONTACT_EMAIL}</a>
             </li>
           </ul>
         </div>
@@ -59,7 +75,7 @@ export default function Footer() {
 
       <div className="border-t border-white/10 py-5">
         <div className="section flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-white/50">
-          <p>© {new Date().getFullYear()} Wahaz Fabrication. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Bellissimo Couture. All rights reserved.</p>
           <div className="flex gap-4">
             <span>Privacy Policy</span>
             <span>Terms of Service</span>

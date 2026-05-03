@@ -45,7 +45,7 @@ export default function Login() {
       <div className="card p-8">
         <h1 className="text-3xl font-serif mb-2 text-center">Sign in</h1>
         <p className="text-sm text-brand-muted text-center mb-6">
-          Welcome back to Wahaz Fabrication
+          Welcome back to Bellissimo Couture
         </p>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input

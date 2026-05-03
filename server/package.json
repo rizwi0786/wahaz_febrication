@@ -1,7 +1,7 @@
 {
-  "name": "wahaz-fabrication-server",
+  "name": "bellissimo-couture-server",
   "version": "1.0.0",
-  "description": "Wahaz Fabrication e-commerce backend (Node + Express + Prisma + PostgreSQL)",
+  "description": "Bellissimo Couture e-commerce backend (Node + Express + Prisma + PostgreSQL)",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -25,6 +25,7 @@
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
+    "googleapis": "^144.0.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",

@@ -1,5 +1,5 @@
 /**
- * Prisma seed script for Wahaz Fabrication
+ * Prisma seed script for Bellissimo Couture
  * Run: npm run seed  (or)  npx prisma db seed
  */
 const { PrismaClient } = require('@prisma/client');
@@ -44,13 +44,13 @@ function buildProducts(category, index) {
   return {
     name: base,
     slug,
-    description: `Premium ${category.name.toLowerCase()} crafted by Wahaz Fabrication. Tailored fit, superior fabric, and refined finish.`,
+    description: `Premium ${category.name.toLowerCase()} crafted by Bellissimo Couture. Tailored fit, superior fabric, and refined finish.`,
     price,
     discountPrice,
     discountPercent: discountPercent || null,
-    fabric: ['Cotton', 'Wool', 'Silk', 'Linen'][index % 4],
-    fit: ['Slim Fit', 'Regular Fit', 'Tailored Fit'][index % 3],
-    occasion: ['Formal', 'Casual', 'Wedding', 'Party'][index % 4],
+    fabric: [['Cotton', 'Wool', 'Silk', 'Linen'][index % 4]],
+    fit: [['Slim Fit', 'Regular Fit', 'Tailored Fit'][index % 3]],
+    occasion: [['Formal', 'Casual', 'Wedding', 'Party', 'Business'][index % 5]],
     careInstructions: 'Dry clean only. Iron on low heat.',
     tags: ['new', 'trending'],
     stock: 50,
@@ -65,17 +65,17 @@ async function main() {
   // Admin user
   const adminPassword = await bcrypt.hash('Admin@123', 12);
   await prisma.user.upsert({
-    where: { email: 'admin@wahazfabrication.com' },
+    where: { email: 'admin@bellissimocouture.com' },
     update: {},
     create: {
       name: 'Admin',
-      email: 'admin@wahazfabrication.com',
+      email: 'admin@bellissimocouture.com',
       password: adminPassword,
       role: 'ADMIN',
       isVerified: true,
     },
   });
-  console.log('Admin seeded: admin@wahazfabrication.com / Admin@123');
+  console.log('Admin seeded: admin@bellissimocouture.com / Admin@123');
 
   // Categories
   for (const cat of CATEGORIES) {
@@ -103,7 +103,7 @@ async function main() {
       await prisma.product.create({
         data: {
           ...data,
-          categoryId: category.id,
+          categories: { connect: [{ id: category.id }] },
           images: {
             create: [
               { url: placeholderImage(`${data.slug}-1`), isPrimary: true, order: 0 },

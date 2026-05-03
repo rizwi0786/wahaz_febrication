@@ -10,6 +10,8 @@ const userCtrl = require('../controllers/user.controller');
 const reviewCtrl = require('../controllers/review.controller');
 const couponCtrl = require('../controllers/coupon.controller');
 const bannerCtrl = require('../controllers/banner.controller');
+const customOrderCtrl = require('../controllers/customOrder.controller');
+const consultationCtrl = require('../controllers/consultation.controller');
 
 // All admin routes are double-protected
 router.use(verifyToken, verifyAdmin);
@@ -21,6 +23,7 @@ router.get('/stats/top-products', adminCtrl.topProducts);
 router.get('/stats/recent-orders', adminCtrl.recentOrders);
 
 // ---- Products ----
+router.get('/products', productCtrl.adminListProducts);
 router.get('/products/:id', productCtrl.adminGetProduct);
 router.post('/products', productCtrl.createProduct);
 router.put('/products/:id', productCtrl.updateProduct);
@@ -53,6 +56,26 @@ router.get('/coupons', couponCtrl.listCoupons);
 router.post('/coupons', couponCtrl.createCoupon);
 router.put('/coupons/:id', couponCtrl.updateCoupon);
 router.delete('/coupons/:id', couponCtrl.deleteCoupon);
+
+// ---- Custom Orders ----
+router.get('/custom-orders', customOrderCtrl.adminListCustomOrders);
+router.get('/custom-orders/:id', customOrderCtrl.adminGetCustomOrder);
+router.put('/custom-orders/:id/quote', customOrderCtrl.adminQuotePrice);
+router.put('/custom-orders/:id/respond-counter', customOrderCtrl.adminRespondCounter);
+router.put('/custom-orders/:id/reject', customOrderCtrl.adminReject);
+
+// ---- Consultations ----
+router.get('/consultations', consultationCtrl.adminListConsultations);
+router.get('/consultations/:id', consultationCtrl.adminGetConsultation);
+router.put('/consultations/:id/confirm', consultationCtrl.adminConfirmConsultation);
+router.put('/consultations/:id/cancel', consultationCtrl.adminCancelConsultation);
+router.put('/consultations/:id/complete', consultationCtrl.adminCompleteConsultation);
+
+// ---- Google Calendar / Meet OAuth setup ----
+router.get('/google/auth-url', consultationCtrl.googleAuthUrl);
+router.get('/google/status', consultationCtrl.googleStatus);
+// NOTE: /google/callback is mounted publicly in app.js because Google
+// redirects the browser to it (no Authorization header).
 
 // ---- Banners ----
 router.get('/banners', bannerCtrl.listAllBanners);

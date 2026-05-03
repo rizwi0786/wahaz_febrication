@@ -9,6 +9,8 @@ import {
   Tag,
   Image,
   Star,
+  Sparkles,
+  CalendarCheck,
   LogOut,
   ExternalLink,
 } from 'lucide-react';
@@ -19,6 +21,8 @@ const NAV = [
   { to: '/admin/products', label: 'Products', icon: Package },
   { to: '/admin/categories', label: 'Categories', icon: FolderTree },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingCart },
+  { to: '/admin/custom-orders', label: 'Custom Orders', icon: Sparkles },
+  { to: '/admin/consultations', label: 'Consultations', icon: CalendarCheck },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/coupons', label: 'Coupons', icon: Tag },
   { to: '/admin/banners', label: 'Banners', icon: Image },
@@ -32,8 +36,8 @@ export default function AdminLayout() {
     <div className="min-h-screen flex bg-gray-50">
       <aside className="w-60 bg-brand-primary text-white flex flex-col sticky top-0 h-screen self-start shrink-0">
         <div className="p-6 border-b border-white/10">
-          <Link to="/admin" className="font-serif text-xl">
-            Wahaz <span className="text-brand-secondary">Admin</span>
+          <Link to="/admin" className="flex items-center gap-2">
+            <img src="/logo.png" alt="Bellissimo Couture" className="h-10 w-auto brightness-200" />
           </Link>
         </div>
         <nav className="flex-1 py-4 overflow-y-auto">

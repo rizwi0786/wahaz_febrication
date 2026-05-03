@@ -84,7 +84,11 @@ async function calculateTotals(cartItems, couponCode) {
 
 // POST /api/orders
 const placeOrder = asyncHandler(async (req, res) => {
-  const { shippingAddress, paymentMethod, couponCode, notes } = req.body;
+  const { shippingAddress, paymentMethod, couponCode, notes, fitPreference } = req.body;
+  const ALLOWED_FITS = ['Slim Fit', 'Regular Fit', 'Tailored Fit', 'Relaxed Fit', 'Classic Fit'];
+  if (fitPreference && !ALLOWED_FITS.includes(fitPreference)) {
+    throw new ApiError(400, `fitPreference must be one of: ${ALLOWED_FITS.join(', ')}`);
+  }
   if (!shippingAddress) throw new ApiError(400, "shippingAddress is required");
   if (!paymentMethod || !["RAZORPAY", "COD"].includes(paymentMethod)) {
     throw new ApiError(400, "paymentMethod must be RAZORPAY or COD");
@@ -105,6 +109,15 @@ const placeOrder = asyncHandler(async (req, res) => {
   });
   if (!cart || cart.items.length === 0)
     throw new ApiError(400, "Cart is empty");
+
+  const unavailable = cart.items.filter((it) => !it.product?.isActive);
+  if (unavailable.length > 0) {
+    const names = unavailable.map((it) => it.product?.name).filter(Boolean).join(', ');
+    throw new ApiError(
+      400,
+      `Some items in your cart are no longer available: ${names}. Please remove them before checking out.`
+    );
+  }
 
   const { subtotal, discount, shippingCharge, tax, total, lineItems, coupon } =
     await calculateTotals(cart.items, couponCode);
@@ -130,18 +143,19 @@ const placeOrder = asyncHandler(async (req, res) => {
         paymentMethod,
         paymentStatus: "PENDING",
         razorpayOrderId: razorpayOrder?.id,
-        orderStatus: "PROCESSING",
+        orderStatus: "ORDER_RECEIVED",
         subtotal,
         discount,
         shippingCharge,
         tax,
         total,
         couponCode: coupon?.code,
+        fitPreference: fitPreference || null,
         notes,
         items: { create: lineItems },
         tracking: {
           create: {
-            status: "PROCESSING",
+            status: "ORDER_RECEIVED",
             message: "Order received",
           },
         },
@@ -158,10 +172,6 @@ const placeOrder = asyncHandler(async (req, res) => {
         });
       }
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-      await tx.order.update({
-        where: { id: created.id },
-        data: { orderStatus: "CONFIRMED" },
-      });
     }
 
     return created;
@@ -189,6 +199,93 @@ const placeOrder = asyncHandler(async (req, res) => {
   });
 });
 
+// Constant-time signature comparison so an attacker can't infer the expected
+// digest from response timing.
+function timingSafeEqualHex(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+async function logPaymentEvent(data) {
+  try {
+    await prisma.paymentEvent.create({ data });
+  } catch (e) {
+    // Unique-violation on (source, eventId, eventType) means we already
+    // logged this event — that's the whole point of the unique constraint.
+    if (e?.code !== "P2002") console.error("[paymentEvent]", e);
+  }
+}
+
+// Promote a PENDING Razorpay order to PAID. Atomic and idempotent: the
+// updateMany WHERE clause guarantees we only run side effects when this
+// call is the one that actually flipped the status.
+async function finalizePaidOrder({
+  orderId,
+  razorpayPaymentId,
+  amountPaise,
+  source,
+}) {
+  return prisma.$transaction(async (tx) => {
+    const flipped = await tx.order.updateMany({
+      where: { id: orderId, paymentStatus: "PENDING" },
+      data: {
+        paymentStatus: "PAID",
+        paymentId: razorpayPaymentId,
+        paymentAmount: amountPaise,
+        paidAt: new Date(),
+      },
+    });
+
+    if (flipped.count === 0) {
+      // Already finalized by the other channel (verify vs webhook). No-op.
+      const existing = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      return { order: existing, alreadyPaid: true };
+    }
+
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    for (const item of order.items) {
+      if (item.variantId) {
+        await tx.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
+    }
+
+    const cart = await tx.cart.findUnique({ where: { userId: order.userId } });
+    if (cart) await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+
+    if (order.couponCode) {
+      await tx.coupon.update({
+        where: { code: order.couponCode },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
+    await tx.orderTracking.create({
+      data: {
+        orderId,
+        status: "ORDER_RECEIVED",
+        message: `Payment received (${source})`,
+      },
+    });
+
+    return { order, alreadyPaid: false };
+  });
+}
+
 // POST /api/orders/verify-payment
 const verifyPayment = asyncHandler(async (req, res) => {
   const { razorpayOrderId, razorpayPaymentId, razorpaySignature, orderId } =
@@ -202,20 +299,6 @@ const verifyPayment = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Missing payment verification fields");
   }
 
-  const body = `${razorpayOrderId}|${razorpayPaymentId}`;
-  const expectedSignature = crypto
-    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-    .update(body)
-    .digest("hex");
-
-  if (expectedSignature !== razorpaySignature) {
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { paymentStatus: "FAILED" },
-    });
-    throw new ApiError(400, "Invalid payment signature");
-  }
-
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { items: true, user: true },
@@ -223,49 +306,253 @@ const verifyPayment = asyncHandler(async (req, res) => {
   if (!order) throw new ApiError(404, "Order not found");
   if (order.userId !== req.user.id) throw new ApiError(403, "Forbidden");
 
-  const updated = await prisma.$transaction(async (tx) => {
-    // Deduct variant stock
-    for (const item of order.items) {
-      if (item.variantId) {
-        await tx.productVariant.update({
-          where: { id: item.variantId },
-          data: { stock: { decrement: item.quantity } },
-        });
-      }
-    }
-    // Clear user's cart
-    const cart = await tx.cart.findUnique({ where: { userId: req.user.id } });
-    if (cart) {
-      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-    }
-    // Bump coupon usage
-    if (order.couponCode) {
-      await tx.coupon.update({
-        where: { code: order.couponCode },
-        data: { usedCount: { increment: 1 } },
-      });
-    }
-
-    return tx.order.update({
-      where: { id: orderId },
-      data: {
-        paymentStatus: "PAID",
-        paymentId: razorpayPaymentId,
-        orderStatus: "CONFIRMED",
-        tracking: {
-          create: { status: "CONFIRMED", message: "Payment received" },
-        },
-      },
-      include: { items: true },
+  // Bind the razorpayOrderId from client to the one we created. If they don't
+  // match, the client is trying to attach a payment from another order.
+  if (
+    !order.razorpayOrderId ||
+    order.razorpayOrderId !== razorpayOrderId
+  ) {
+    await logPaymentEvent({
+      orderId,
+      source: "verify",
+      eventType: "verify.order_mismatch",
+      eventId: razorpayPaymentId,
+      razorpayOrderId,
+      razorpayPaymentId,
+      status: "failed",
+      errorMessage: "razorpayOrderId does not match order",
+      ipAddress: req.ip,
     });
+    throw new ApiError(400, "Order/payment mismatch");
+  }
+
+  // 1. HMAC signature check (constant-time)
+  const body = `${razorpayOrderId}|${razorpayPaymentId}`;
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+    .update(body)
+    .digest("hex");
+
+  if (!timingSafeEqualHex(expectedSignature, razorpaySignature)) {
+    await prisma.order.updateMany({
+      where: { id: orderId, paymentStatus: "PENDING" },
+      data: { paymentStatus: "FAILED" },
+    });
+    await logPaymentEvent({
+      orderId,
+      source: "verify",
+      eventType: "verify.signature_failed",
+      eventId: razorpayPaymentId,
+      razorpayOrderId,
+      razorpayPaymentId,
+      status: "failed",
+      signatureValid: false,
+      ipAddress: req.ip,
+    });
+    throw new ApiError(400, "Invalid payment signature");
+  }
+
+  // 2. Pull the actual payment from Razorpay and validate amount/currency/status
+  // server-side. Never trust what the client tells us about how much was paid.
+  let payment;
+  try {
+    payment = await razorpay.payments.fetch(razorpayPaymentId);
+  } catch (e) {
+    await logPaymentEvent({
+      orderId,
+      source: "verify",
+      eventType: "verify.fetch_failed",
+      eventId: razorpayPaymentId,
+      razorpayPaymentId,
+      status: "failed",
+      errorMessage: e?.message,
+      ipAddress: req.ip,
+    });
+    throw new ApiError(502, "Could not verify payment with gateway");
+  }
+
+  const expectedAmount = Math.round(Number(order.total) * 100);
+  const validations = [
+    [payment.order_id === razorpayOrderId, "order_id mismatch"],
+    [payment.amount === expectedAmount, "amount mismatch"],
+    [payment.currency === "INR", "currency mismatch"],
+    [
+      payment.status === "captured" || payment.status === "authorized",
+      `unexpected status ${payment.status}`,
+    ],
+  ];
+  const failed = validations.find(([ok]) => !ok);
+  if (failed) {
+    await prisma.order.updateMany({
+      where: { id: orderId, paymentStatus: "PENDING" },
+      data: { paymentStatus: "FAILED" },
+    });
+    await logPaymentEvent({
+      orderId,
+      source: "verify",
+      eventType: "verify.validation_failed",
+      eventId: razorpayPaymentId,
+      razorpayOrderId,
+      razorpayPaymentId,
+      amount: payment.amount,
+      currency: payment.currency,
+      status: "failed",
+      signatureValid: true,
+      errorMessage: failed[1],
+      rawPayload: payment,
+      ipAddress: req.ip,
+    });
+    throw new ApiError(400, `Payment validation failed: ${failed[1]}`);
+  }
+
+  // 3. Promote to PAID idempotently
+  const { order: updated, alreadyPaid } = await finalizePaidOrder({
+    orderId,
+    razorpayPaymentId,
+    amountPaise: payment.amount,
+    source: "verify",
   });
 
-  const tpl = emailTemplates.orderConfirmation(updated);
-  sendEmail({ to: order.user.email, ...tpl }).catch((e) =>
-    console.error("[email]", e),
-  );
+  await logPaymentEvent({
+    orderId,
+    source: "verify",
+    eventType: alreadyPaid ? "verify.already_paid" : "verify.success",
+    eventId: razorpayPaymentId,
+    razorpayOrderId,
+    razorpayPaymentId,
+    amount: payment.amount,
+    currency: payment.currency,
+    status: "success",
+    signatureValid: true,
+    ipAddress: req.ip,
+  });
+
+  if (!alreadyPaid) {
+    const tpl = emailTemplates.orderConfirmation(updated);
+    sendEmail({ to: order.user.email, ...tpl }).catch((e) =>
+      console.error("[email]", e),
+    );
+  }
 
   res.json({ success: true, order: updated });
+});
+
+// POST /api/webhooks/razorpay  (raw body, no auth)
+// Authoritative source of payment truth. Razorpay retries until 2xx, so we
+// must dedup via PaymentEvent.unique(source, eventId, eventType).
+const razorpayWebhook = asyncHandler(async (req, res) => {
+  const signature = req.headers["x-razorpay-signature"];
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!secret) {
+    console.error("[webhook] RAZORPAY_WEBHOOK_SECRET not set");
+    return res.status(500).json({ success: false });
+  }
+
+  const rawBody = req.body; // Buffer (express.raw)
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
+
+  if (!signature || !timingSafeEqualHex(expected, String(signature))) {
+    await logPaymentEvent({
+      source: "webhook",
+      eventType: "webhook.signature_failed",
+      status: "failed",
+      signatureValid: false,
+      ipAddress: req.ip,
+    });
+    return res.status(400).json({ success: false, message: "Invalid signature" });
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(rawBody.toString("utf8"));
+  } catch {
+    return res.status(400).json({ success: false, message: "Invalid JSON" });
+  }
+
+  const eventType = payload.event;
+  const paymentEntity = payload.payload?.payment?.entity;
+  const orderEntity = payload.payload?.order?.entity;
+  const razorpayPaymentId = paymentEntity?.id;
+  const razorpayOrderId = paymentEntity?.order_id || orderEntity?.id;
+
+  // Locate our internal order by razorpayOrderId (unique).
+  let dbOrder = null;
+  if (razorpayOrderId) {
+    dbOrder = await prisma.order.findUnique({
+      where: { razorpayOrderId },
+    });
+  }
+
+  // Always log the event first (idempotent via unique constraint).
+  await logPaymentEvent({
+    orderId: dbOrder?.id,
+    source: "webhook",
+    eventType,
+    eventId: razorpayPaymentId || payload.payload?.refund?.entity?.id || payload.id,
+    razorpayOrderId,
+    razorpayPaymentId,
+    amount: paymentEntity?.amount,
+    currency: paymentEntity?.currency,
+    status: paymentEntity?.status,
+    signatureValid: true,
+    rawPayload: payload,
+    ipAddress: req.ip,
+  });
+
+  if (!dbOrder) {
+    // Webhook for an order we don't know about — ack so Razorpay stops retrying.
+    return res.json({ success: true, ignored: true });
+  }
+
+  if (eventType === "payment.captured" || eventType === "order.paid") {
+    const expectedAmount = Math.round(Number(dbOrder.total) * 100);
+    if (
+      paymentEntity &&
+      paymentEntity.amount === expectedAmount &&
+      paymentEntity.currency === "INR"
+    ) {
+      const { order: updated, alreadyPaid } = await finalizePaidOrder({
+        orderId: dbOrder.id,
+        razorpayPaymentId,
+        amountPaise: paymentEntity.amount,
+        source: "webhook",
+      });
+      if (!alreadyPaid) {
+        const user = await prisma.user.findUnique({
+          where: { id: updated.userId },
+        });
+        const tpl = emailTemplates.orderConfirmation(updated);
+        sendEmail({ to: user.email, ...tpl }).catch((e) =>
+          console.error("[email]", e),
+        );
+      }
+    } else {
+      await logPaymentEvent({
+        orderId: dbOrder.id,
+        source: "webhook",
+        eventType: "webhook.amount_mismatch",
+        eventId: razorpayPaymentId,
+        razorpayOrderId,
+        razorpayPaymentId,
+        amount: paymentEntity?.amount,
+        currency: paymentEntity?.currency,
+        status: "failed",
+        errorMessage: `expected ${expectedAmount} got ${paymentEntity?.amount}`,
+        rawPayload: payload,
+      });
+    }
+  } else if (eventType === "payment.failed") {
+    await prisma.order.updateMany({
+      where: { id: dbOrder.id, paymentStatus: "PENDING" },
+      data: { paymentStatus: "FAILED" },
+    });
+  }
+
+  // Refund events: log only for now; reconciliation handled later.
+  res.json({ success: true });
 });
 
 // GET /api/orders
@@ -303,16 +590,19 @@ const cancelOrder = asyncHandler(async (req, res) => {
   });
   if (!order) throw new ApiError(404, "Order not found");
   if (order.userId !== req.user.id) throw new ApiError(403, "Forbidden");
-  if (!["PROCESSING", "CONFIRMED"].includes(order.orderStatus)) {
+  if (!["ORDER_RECEIVED", "IN_TAILORING"].includes(order.orderStatus)) {
     throw new ApiError(
       400,
       `Cannot cancel an order with status ${order.orderStatus}`,
     );
   }
 
+  const stockWasDeducted =
+    order.paymentMethod === "COD" || order.paymentStatus === "PAID";
+
   const updated = await prisma.$transaction(async (tx) => {
-    // Restore stock if it was deducted (CONFIRMED or COD)
-    if (order.orderStatus === "CONFIRMED" || order.paymentMethod === "COD") {
+    // Restore stock if it was already deducted (COD always; Razorpay only after payment).
+    if (stockWasDeducted) {
       for (const item of order.items) {
         if (item.variantId) {
           await tx.productVariant.update({
@@ -397,8 +687,10 @@ const listAllOrders = asyncHandler(async (req, res) => {
 const updateOrderStatus = asyncHandler(async (req, res) => {
   const { status, message, location } = req.body;
   const VALID = [
-    "PROCESSING",
-    "CONFIRMED",
+    "ORDER_RECEIVED",
+    "IN_TAILORING",
+    "QUALITY_CHECK",
+    "READY_TO_SHIP",
     "SHIPPED",
     "OUT_FOR_DELIVERY",
     "DELIVERED",
@@ -432,7 +724,11 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     include: { items: true, tracking: true },
   });
 
-  const tpl = emailTemplates.orderStatusUpdate(updated, status, message);
+  const tpl = emailTemplates.orderStatusUpdate(
+    { ...updated, user: order.user },
+    status,
+    message,
+  );
   sendEmail({ to: order.user.email, ...tpl }).catch((e) =>
     console.error("[email]", e),
   );
@@ -457,6 +753,7 @@ const adminGetOrder = asyncHandler(async (req, res) => {
 module.exports = {
   placeOrder,
   verifyPayment,
+  razorpayWebhook,
   getMyOrders,
   getOrder,
   cancelOrder,

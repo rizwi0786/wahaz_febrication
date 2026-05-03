@@ -76,7 +76,9 @@ const deleteCategory = asyncHandler(async (req, res) => {
   const existing = await prisma.category.findUnique({ where: { id } });
   if (!existing) throw new ApiError(404, 'Category not found');
 
-  const productCount = await prisma.product.count({ where: { categoryId: id } });
+  const productCount = await prisma.product.count({
+    where: { categories: { some: { id } } },
+  });
   if (productCount > 0) {
     throw new ApiError(400, `Cannot delete: ${productCount} products use this category`);
   }

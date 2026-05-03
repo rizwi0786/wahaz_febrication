@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Heart, Share2, Star, Truck, ShieldCheck, RefreshCw, Plus, Minus } from 'lucide-react';
@@ -7,6 +7,7 @@ import { useGetProductQuery } from '../store/api/productApi';
 import { useAddToCartMutation } from '../store/api/cartApi';
 import { useAddToWishlistMutation } from '../store/api/userApi';
 import ProductCard from '../components/product/ProductCard';
+import SizeChartModal from '../components/product/SizeChartModal';
 import Loader from '../components/common/Loader';
 import Button from '../components/common/Button';
 import { formatCurrency } from '../utils/format';
@@ -25,6 +26,7 @@ export default function ProductDetail() {
   const [selectedSize, setSelectedSize] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
 
   const product = data?.product;
   const related = data?.related || [];
@@ -44,10 +46,32 @@ export default function ProductDetail() {
     return product.variants.filter((v) => v.color === selectedColor);
   }, [product, selectedColor]);
 
+  const isColorOutOfStock = (colorName) => {
+    if (!product?.variants) return false;
+    const variants = product.variants.filter((v) => v.color === colorName);
+    return variants.length > 0 && variants.every((v) => v.stock === 0);
+  };
+
   const selectedVariant = useMemo(() => {
     if (!selectedColor || !selectedSize) return null;
     return product?.variants?.find((v) => v.color === selectedColor && v.size === selectedSize);
   }, [product, selectedColor, selectedSize]);
+
+  const allOutOfStock = product?.variants?.length > 0 && product.variants.every((v) => v.stock === 0);
+
+  const galleryImages = useMemo(() => {
+    if (!product?.images?.length) return [];
+    const noColor = product.images.filter((img) => !img.color);
+    if (selectedColor) {
+      const byColor = product.images.filter((img) => img.color === selectedColor);
+      if (byColor.length > 0 || noColor.length > 0) return [...noColor, ...byColor];
+    }
+    return noColor.length > 0 ? noColor : product.images;
+  }, [product, selectedColor]);
+
+  useEffect(() => {
+    setSelectedImage(0);
+  }, [galleryImages]);
 
   if (isLoading) return <Loader className="py-24" size="lg" />;
   if (!product) return <p className="text-center py-24">Product not found</p>;
@@ -98,27 +122,29 @@ export default function ProductDetail() {
 
   return (
     <div className="section py-8">
-      <nav className="text-xs text-brand-muted mb-6">
+      <nav className="text-xs text-brand-muted mb-6 flex flex-wrap items-center gap-x-1">
         <Link to="/" className="hover:text-brand-primary">Home</Link> /{' '}
-        <Link to="/shop" className="hover:text-brand-primary">Shop</Link> /{' '}
-        <Link to={`/shop?category=${product.category?.slug}`} className="hover:text-brand-primary">
-          {product.category?.name}
-        </Link>{' '}
-        / <span className="text-brand-primary">{product.name}</span>
+        <Link to="/shop" className="hover:text-brand-primary">Shop</Link>
+        {product.categories?.map((c) => (
+          <span key={c.id} className="flex items-center gap-x-1">
+            / <Link to={`/shop?category=${c.slug}`} className="hover:text-brand-primary">{c.name}</Link>
+          </span>
+        ))}
+        <span>/ <span className="text-brand-primary">{product.name}</span></span>
       </nav>
 
       <div className="grid md:grid-cols-2 gap-6 md:gap-10">
         {/* Gallery */}
         <div>
-          <div className="bg-gray-100 rounded-lg overflow-hidden aspect-[4/5] mb-4">
+          <div className="bg-gray-100 rounded-lg overflow-hidden aspect-[4/5] md:aspect-auto md:max-h-[65vh] md:flex md:items-center md:justify-center mb-4">
             <img
-              src={product.images?.[selectedImage]?.url}
+              src={galleryImages[selectedImage]?.url}
               alt={product.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover md:object-contain"
             />
           </div>
           <div className="flex gap-3 overflow-x-auto scrollbar-none">
-            {product.images?.map((img, i) => (
+            {galleryImages.map((img, i) => (
               <button
                 key={img.id}
                 onClick={() => setSelectedImage(i)}
@@ -164,25 +190,49 @@ export default function ProductDetail() {
             )}
           </div>
 
+          {/* Out of stock banner */}
+          {allOutOfStock && (
+            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 font-medium">
+              This product is currently out of stock
+            </div>
+          )}
+
           {/* Color */}
           {colors.length > 0 && (
             <div className="mb-4">
-              <label className="label">Color: <span className="font-normal">{selectedColor || 'Select'}</span></label>
+              <label className="label">
+                Color: <span className="font-normal">{selectedColor || 'Select'}</span>
+                {selectedColor && isColorOutOfStock(selectedColor) && (
+                  <span className="ml-2 text-xs font-medium text-red-600">(Out of stock)</span>
+                )}
+              </label>
               <div className="flex flex-wrap gap-2">
-                {colors.map((v) => (
-                  <button
-                    key={v.id}
-                    onClick={() => {
-                      setSelectedColor(v.color);
-                      setSelectedSize('');
-                    }}
-                    title={v.color}
-                    className={`w-10 h-10 rounded-full border-2 transition ${
-                      selectedColor === v.color ? 'border-brand-secondary scale-110' : 'border-gray-200'
-                    }`}
-                    style={{ backgroundColor: v.colorHex || '#888' }}
-                  />
-                ))}
+                {colors.map((v) => {
+                  const oos = isColorOutOfStock(v.color);
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => {
+                        setSelectedColor(v.color);
+                        setSelectedSize('');
+                      }}
+                      title={oos ? `${v.color} — Out of stock` : v.color}
+                      className={`relative w-10 h-10 rounded-full border-2 transition ${
+                        selectedColor === v.color ? 'border-brand-secondary scale-110' : 'border-gray-200'
+                      } ${oos ? 'opacity-50' : ''}`}
+                      style={{ backgroundColor: v.colorHex || '#888' }}
+                    >
+                      {oos && (
+                        <span
+                          aria-hidden
+                          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                        >
+                          <span className="block w-[140%] h-[2px] bg-red-500 rotate-45" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -192,26 +242,50 @@ export default function ProductDetail() {
             <div className="mb-4">
               <div className="flex items-center justify-between">
                 <label className="label">Size</label>
-                <button className="text-xs text-brand-secondary hover:underline">Size guide</button>
+                <button
+                  type="button"
+                  onClick={() => setSizeChartOpen(true)}
+                  className="text-xs text-brand-secondary hover:underline"
+                >
+                  Size guide
+                </button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {sizesForColor.map((v) => (
-                  <button
-                    key={v.id}
-                    onClick={() => setSelectedSize(v.size)}
-                    disabled={v.stock === 0}
-                    className={`min-w-[48px] px-4 py-2 text-sm border rounded transition ${
-                      selectedSize === v.size
-                        ? 'bg-brand-primary text-white border-brand-primary'
-                        : v.stock === 0
-                        ? 'border-gray-200 text-gray-300 line-through'
-                        : 'border-gray-300 hover:border-brand-primary'
-                    }`}
-                  >
-                    {v.size}
-                  </button>
-                ))}
+                {sizesForColor.map((v) => {
+                  const oos = v.stock === 0;
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => setSelectedSize(v.size)}
+                      disabled={oos}
+                      title={oos ? 'Out of stock' : ''}
+                      className={`relative min-w-[48px] px-4 py-2 text-sm border rounded transition overflow-hidden ${
+                        selectedSize === v.size
+                          ? 'bg-brand-primary text-white border-brand-primary'
+                          : oos
+                          ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                          : 'border-gray-300 hover:border-brand-primary'
+                      }`}
+                    >
+                      {v.size}
+                      {oos && (
+                        <span
+                          aria-hidden
+                          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                        >
+                          <span className="block w-full h-[1.5px] bg-red-400 rotate-[-20deg]" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+              {sizesForColor.every((v) => v.stock === 0) && (
+                <p className="text-xs text-red-600 mt-2 font-medium">All sizes for this color are out of stock</p>
+              )}
+              {selectedVariant && selectedVariant.stock > 0 && selectedVariant.stock <= 5 && (
+                <p className="text-xs text-orange-600 mt-2 font-medium">Only {selectedVariant.stock} left in stock</p>
+              )}
             </div>
           )}
 
@@ -261,9 +335,15 @@ export default function ProductDetail() {
 
           {/* Highlights */}
           <div className="grid grid-cols-2 gap-3 text-sm border-t pt-6">
-            {product.fabric && <div><span className="text-brand-muted">Fabric: </span>{product.fabric}</div>}
-            {product.fit && <div><span className="text-brand-muted">Fit: </span>{product.fit}</div>}
-            {product.occasion && <div><span className="text-brand-muted">Occasion: </span>{product.occasion}</div>}
+            {product.fabric?.length > 0 && (
+              <div><span className="text-brand-muted">Fabric: </span>{product.fabric.join(', ')}</div>
+            )}
+            {product.fit?.length > 0 && (
+              <div><span className="text-brand-muted">Fit: </span>{product.fit.join(', ')}</div>
+            )}
+            {product.occasion?.length > 0 && (
+              <div><span className="text-brand-muted">Occasion: </span>{product.occasion.join(', ')}</div>
+            )}
             {product.careInstructions && (
               <div><span className="text-brand-muted">Care: </span>{product.careInstructions}</div>
             )}
@@ -353,6 +433,12 @@ export default function ProductDetail() {
           )}
         </div>
       </div>
+
+      <SizeChartModal
+        open={sizeChartOpen}
+        onClose={() => setSizeChartOpen(false)}
+        productFits={product.fit || []}
+      />
 
       {/* Related */}
       {related.length > 0 && (

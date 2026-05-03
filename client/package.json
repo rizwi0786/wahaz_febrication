@@ -1,7 +1,7 @@
 {
-  "name": "wahaz-fabrication-client",
+  "name": "bellissimo-couture-client",
   "version": "1.0.0",
-  "description": "Wahaz Fabrication storefront and admin panel",
+  "description": "Bellissimo Couture storefront and admin panel",
   "type": "module",
   "scripts": {
     "dev": "vite",

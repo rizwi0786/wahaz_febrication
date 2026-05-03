@@ -36,11 +36,13 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  addresses Address[]
-  orders    Order[]
-  reviews   Review[]
-  wishlist  Wishlist[]
-  cart      Cart?
+  addresses    Address[]
+  orders       Order[]
+  reviews      Review[]
+  wishlist     Wishlist[]
+  cart         Cart?
+  customOrders  CustomOrder[]
+  consultations ConsultationBooking[]
 
   @@index([email])
 }
@@ -75,7 +77,7 @@ model Category {
   image       String?   @db.Text // base64 data URL or remote URL
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
-  products    Product[]
+  products    Product[] @relation("ProductCategories")
 }
 
 model Product {
@@ -86,12 +88,11 @@ model Product {
   price            Decimal  @db.Decimal(10, 2)
   discountPrice    Decimal? @db.Decimal(10, 2)
   discountPercent  Int?
-  categoryId       String
-  category         Category @relation(fields: [categoryId], references: [id])
+  categories       Category[] @relation("ProductCategories")
   tags             String[]
-  fabric           String?
-  fit              String?
-  occasion         String?
+  fabric           String[]   @default([])
+  fit              String[]   @default([])
+  occasion         String[]   @default([])
   careInstructions String?
   isFeatured       Boolean  @default(false)
   isNewArrival     Boolean  @default(false)
@@ -109,7 +110,6 @@ model Product {
   cartItems  CartItem[]
   orderItems OrderItem[]
 
-  @@index([categoryId])
   @@index([slug])
   @@index([isActive, isFeatured])
 }
@@ -120,9 +120,11 @@ model ProductImage {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   url       String  @db.Text // base64 data URL or remote URL
   isPrimary Boolean @default(false)
+  color     String?
   order     Int     @default(0)
 
   @@index([productId])
+  @@index([productId, color])
 }
 
 model ProductVariant {
@@ -171,8 +173,10 @@ model CartItem {
 // ------------------------------------------------------------------
 
 enum OrderStatus {
-  PROCESSING
-  CONFIRMED
+  ORDER_RECEIVED
+  IN_TAILORING
+  QUALITY_CHECK
+  READY_TO_SHIP
   SHIPPED
   OUT_FOR_DELIVERY
   DELIVERED
@@ -202,15 +206,18 @@ model Order {
   shippingAddress Json
   paymentMethod   PaymentMethod
   paymentStatus   PaymentStatus @default(PENDING)
-  paymentId       String?
-  razorpayOrderId String?
-  orderStatus     OrderStatus   @default(PROCESSING)
+  paymentId       String?       @unique
+  razorpayOrderId String?       @unique
+  paymentAmount   Int?
+  paidAt          DateTime?
+  orderStatus     OrderStatus   @default(ORDER_RECEIVED)
   subtotal        Decimal       @db.Decimal(10, 2)
   discount        Decimal       @default(0) @db.Decimal(10, 2)
   shippingCharge  Decimal       @default(0) @db.Decimal(10, 2)
   tax             Decimal       @default(0) @db.Decimal(10, 2)
   total           Decimal       @db.Decimal(10, 2)
   couponCode      String?
+  fitPreference   String?
   notes           String?
   deliveredAt     DateTime?
   cancelledAt     DateTime?
@@ -218,10 +225,38 @@ model Order {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  tracking OrderTracking[]
+  tracking      OrderTracking[]
+  paymentEvents PaymentEvent[]
 
   @@index([userId])
   @@index([orderStatus])
+  @@index([createdAt])
+}
+
+// Append-only audit trail for every payment-related event we observe,
+// from either the client verify-payment call or the Razorpay webhook.
+// Used for idempotency (unique on source+eventId) and forensic review.
+model PaymentEvent {
+  id                String   @id @default(uuid())
+  orderId           String?
+  order             Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  source            String   // "verify" | "webhook"
+  eventType         String   // e.g. "payment.captured", "verify.success", "verify.signature_failed"
+  eventId           String?  // Razorpay event/payment id used for dedup
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  amount            Int?     // paise
+  currency          String?
+  status            String?  // "success" | "failed"
+  signatureValid    Boolean?
+  errorMessage      String?
+  ipAddress         String?
+  rawPayload        Json?
+  createdAt         DateTime @default(now())
+
+  @@unique([source, eventId, eventType])
+  @@index([orderId])
+  @@index([razorpayPaymentId])
   @@index([createdAt])
 }
 
@@ -311,6 +346,87 @@ model Coupon {
   isActive       Boolean      @default(true)
   expiresAt      DateTime?
   createdAt      DateTime     @default(now())
+}
+
+// ------------------------------------------------------------------
+// Custom design orders (price negotiation flow)
+// ------------------------------------------------------------------
+
+enum CustomOrderStatus {
+  PENDING_REVIEW
+  PRICE_QUOTED
+  COUNTER_OFFERED
+  APPROVED
+  REJECTED
+  CANCELLED
+  PAID
+}
+
+model CustomOrder {
+  id               String            @id @default(uuid())
+  requestNumber    String            @unique
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  designImages     String[]          // base64 data URLs
+  clothPhotos      String[]          // base64 data URLs
+  description      String?
+  sizeDetails      Json              // { chest, waist, hips, length, shoulder, sleeve, ... }
+  quantity         Int               @default(1)
+  status           CustomOrderStatus @default(PENDING_REVIEW)
+  adminQuotedPrice Decimal?          @db.Decimal(10, 2)
+  userCounterPrice Decimal?          @db.Decimal(10, 2)
+  finalPrice       Decimal?          @db.Decimal(10, 2)
+  counterUsed      Boolean           @default(false)
+  adminNotes       String?
+  userNotes        String?
+  rejectReason     String?
+  shippingAddress  Json?
+  paymentMethod    PaymentMethod?
+  paymentStatus    PaymentStatus     @default(PENDING)
+  paymentId        String?
+  razorpayOrderId  String?
+  orderId          String?           @unique
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ------------------------------------------------------------------
+// Consultation / studio session bookings
+// ------------------------------------------------------------------
+
+enum ConsultationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model ConsultationBooking {
+  id            String             @id @default(uuid())
+  bookingNumber String             @unique
+  userId        String?
+  user          User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name          String
+  email         String
+  phone         String
+  preferredDate DateTime
+  preferredTime String             // "HH:MM" 24h
+  duration      Int                @default(30) // minutes
+  topic         String?
+  notes         String?
+  status        ConsultationStatus @default(PENDING)
+  meetLink      String?
+  adminNotes    String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([preferredDate])
 }
 
 model Banner {

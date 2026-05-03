@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { statusColor } from '../../utils/format';
+import { statusColor, orderStatusLabel } from '../../utils/format';
 
 export default function Badge({ children, variant, className }) {
   const variants = {
@@ -31,7 +31,7 @@ export function StatusBadge({ status }) {
         statusColor(status)
       )}
     >
-      {String(status).replace(/_/g, ' ')}
+      {orderStatusLabel(status)}
     </span>
   );
 }

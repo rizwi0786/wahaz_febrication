@@ -31,7 +31,7 @@ export async function openRazorpayCheckout({
     key: keyId || import.meta.env.VITE_RAZORPAY_KEY_ID,
     amount,
     currency,
-    name: 'Wahaz Fabrication',
+    name: 'Bellissimo Couture',
     description: 'Order payment',
     order_id: razorpayOrderId,
     prefill: {

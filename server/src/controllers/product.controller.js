@@ -8,7 +8,7 @@ const { fileToDataUrl } = require('../middleware/upload.middleware');
 const productInclude = {
   images: { orderBy: { order: 'asc' } },
   variants: true,
-  category: { select: { id: true, name: true, slug: true } },
+  categories: { select: { id: true, name: true, slug: true } },
 };
 
 // Light include — use for listing endpoints. Returns only the primary
@@ -22,8 +22,23 @@ const productListInclude = {
   variants: {
     select: { id: true, size: true, color: true, colorHex: true, stock: true },
   },
-  category: { select: { id: true, name: true, slug: true } },
+  categories: { select: { id: true, name: true, slug: true } },
 };
+
+function toStringArray(value) {
+  if (value == null) return [];
+  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
+  return String(value).split(',').map((v) => v.trim()).filter(Boolean);
+}
+
+function toCategoryIds(body) {
+  if (Array.isArray(body.categoryIds)) return body.categoryIds.filter(Boolean);
+  if (typeof body.categoryIds === 'string' && body.categoryIds) {
+    return body.categoryIds.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  if (body.categoryId) return [body.categoryId];
+  return [];
+}
 
 // GET /api/products
 const listProducts = asyncHandler(async (req, res) => {
@@ -76,7 +91,7 @@ const newArrivals = asyncHandler(async (req, res) => {
 const byCategory = asyncHandler(async (req, res) => {
   const { categorySlug } = req.params;
   const products = await prisma.product.findMany({
-    where: { isActive: true, category: { slug: categorySlug } },
+    where: { isActive: true, categories: { some: { slug: categorySlug } } },
     include: productListInclude,
     orderBy: { createdAt: 'desc' },
   });
@@ -99,15 +114,18 @@ const getProduct = asyncHandler(async (req, res) => {
   });
   if (!product) throw new ApiError(404, 'Product not found');
 
-  const related = await prisma.product.findMany({
-    where: {
-      isActive: true,
-      categoryId: product.categoryId,
-      id: { not: product.id },
-    },
-    take: 4,
-    include: productListInclude,
-  });
+  const categoryIds = product.categories.map((c) => c.id);
+  const related = categoryIds.length
+    ? await prisma.product.findMany({
+        where: {
+          isActive: true,
+          id: { not: product.id },
+          categories: { some: { id: { in: categoryIds } } },
+        },
+        take: 4,
+        include: productListInclude,
+      })
+    : [];
 
   res.json({ success: true, product, related });
 });
@@ -132,11 +150,7 @@ const createProduct = asyncHandler(async (req, res) => {
     price,
     discountPrice,
     discountPercent,
-    categoryId,
     tags,
-    fabric,
-    fit,
-    occasion,
     careInstructions,
     isFeatured,
     isNewArrival,
@@ -145,8 +159,9 @@ const createProduct = asyncHandler(async (req, res) => {
     variants,
   } = req.body;
 
-  if (!name || !description || !price || !categoryId) {
-    throw new ApiError(400, 'name, description, price, and categoryId are required');
+  const categoryIds = toCategoryIds(req.body);
+  if (!name || !description || !price || categoryIds.length === 0) {
+    throw new ApiError(400, 'name, description, price, and at least one category are required');
   }
 
   const slug = slugify(`${name}-${Date.now()}`, { lower: true, strict: true });
@@ -159,11 +174,11 @@ const createProduct = asyncHandler(async (req, res) => {
       price: Number(price),
       discountPrice: discountPrice ? Number(discountPrice) : null,
       discountPercent: discountPercent ? Number(discountPercent) : null,
-      categoryId,
+      categories: { connect: categoryIds.map((cid) => ({ id: cid })) },
       tags: Array.isArray(tags) ? tags : tags ? tags.split(',').map((t) => t.trim()) : [],
-      fabric,
-      fit,
-      occasion,
+      fabric: toStringArray(req.body.fabric),
+      fit: toStringArray(req.body.fit),
+      occasion: toStringArray(req.body.occasion),
       careInstructions,
       isFeatured: !!isFeatured,
       isNewArrival: !!isNewArrival,
@@ -196,6 +211,20 @@ const updateProduct = asyncHandler(async (req, res) => {
     data.tags = data.tags.split(',').map((t) => t.trim()).filter(Boolean);
   }
 
+  if ('fabric' in data) data.fabric = toStringArray(data.fabric);
+  if ('fit' in data) data.fit = toStringArray(data.fit);
+  if ('occasion' in data) data.occasion = toStringArray(data.occasion);
+
+  let categoriesUpdate;
+  if ('categoryIds' in req.body || 'categoryId' in req.body) {
+    const ids = toCategoryIds(req.body);
+    if (ids.length === 0) throw new ApiError(400, 'At least one category is required');
+    categoriesUpdate = { set: ids.map((cid) => ({ id: cid })) };
+  }
+  delete data.categoryIds;
+  delete data.categoryId;
+  delete data.categories;
+
   // Normalize numeric fields. HTML inputs always arrive as strings, and an
   // empty string should become `null` for the nullable columns (discountPrice,
   // discountPercent) rather than NaN.
@@ -222,21 +251,57 @@ const updateProduct = asyncHandler(async (req, res) => {
 
   const product = await prisma.$transaction(async (tx) => {
     if (variants) {
-      await tx.productVariant.deleteMany({ where: { productId: id } });
-      await tx.productVariant.createMany({
-        data: variants.map((v) => ({
-          productId: id,
-          size: v.size,
-          color: v.color,
-          colorHex: v.colorHex,
-          stock: Number(v.stock || 0),
-          sku: v.sku,
-        })),
+      const existingVariants = await tx.productVariant.findMany({
+        where: { productId: id },
       });
+
+      const incomingIds = variants.filter((v) => v.id).map((v) => v.id);
+
+      // 1. Delete only the variants that were removed by the admin.
+      //    First clear cart items referencing those variants so the FK
+      //    constraint is not violated — existing orders are unaffected
+      //    because OrderItem stores size/color as plain values.
+      const removedIds = existingVariants
+        .filter((ev) => !incomingIds.includes(ev.id))
+        .map((ev) => ev.id);
+
+      if (removedIds.length) {
+        await tx.cartItem.deleteMany({ where: { variantId: { in: removedIds } } });
+        await tx.productVariant.deleteMany({ where: { id: { in: removedIds } } });
+      }
+
+      // 2. Update existing variants in place.
+      for (const v of variants.filter((v) => v.id)) {
+        await tx.productVariant.update({
+          where: { id: v.id },
+          data: {
+            size: v.size,
+            color: v.color,
+            colorHex: v.colorHex,
+            stock: Number(v.stock || 0),
+            sku: v.sku,
+          },
+        });
+      }
+
+      // 3. Create newly added variants.
+      const newVariants = variants.filter((v) => !v.id && v.size && v.color);
+      if (newVariants.length) {
+        await tx.productVariant.createMany({
+          data: newVariants.map((v) => ({
+            productId: id,
+            size: v.size,
+            color: v.color,
+            colorHex: v.colorHex,
+            stock: Number(v.stock || 0),
+            sku: v.sku,
+          })),
+        });
+      }
     }
     return tx.product.update({
       where: { id },
-      data: rest,
+      data: { ...rest, ...(categoriesUpdate ? { categories: categoriesUpdate } : {}) },
       include: productInclude,
     });
   });
@@ -245,11 +310,43 @@ const updateProduct = asyncHandler(async (req, res) => {
 });
 
 // DELETE /api/admin/products/:id
+// Soft-delete: mark inactive. Keeps the row so SKU sequences don't collide
+// and so OrderItem references stay intact. Admins can re-activate via the
+// edit form.
 const deleteProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  // Images cascade-delete because ProductImage has onDelete: Cascade
-  await prisma.product.delete({ where: { id } });
-  res.json({ success: true, message: 'Product deleted' });
+  const existing = await prisma.product.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) throw new ApiError(404, 'Product not found');
+  await prisma.product.update({ where: { id }, data: { isActive: false } });
+  res.json({ success: true, message: 'Product deactivated' });
+});
+
+// GET /api/admin/products
+// Like the public listing but returns inactive products too and skips the
+// `isActive: true` floor that buildProductQuery applies.
+const adminListProducts = asyncHandler(async (req, res) => {
+  const { where, orderBy, skip, take, pageNum } = buildProductQuery(req.query);
+  delete where.isActive;
+
+  const [total, products] = await prisma.$transaction([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      orderBy,
+      skip,
+      take,
+      include: productListInclude,
+    }),
+  ]);
+
+  res.json({
+    success: true,
+    page: pageNum,
+    limit: take,
+    total,
+    totalPages: Math.ceil(total / take),
+    products,
+  });
 });
 
 // POST /api/admin/products/:id/images
@@ -259,17 +356,41 @@ const deleteProduct = asyncHandler(async (req, res) => {
 const uploadImages = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  // Collect incoming image payloads from either upload path
-  let dataUrls = [];
+  let items = [];
   if (req.files?.length) {
-    dataUrls = req.files.map(fileToDataUrl).filter(Boolean);
+    const colors = [].concat(req.body?.color || []);
+    const primaries = [].concat(req.body?.isPrimary || []);
+    items = req.files
+      .map((file, idx) => {
+        const url = fileToDataUrl(file);
+        if (!url) return null;
+        return {
+          url,
+          color: colors[idx] || colors[0] || null,
+          isPrimary: String(primaries[idx] || primaries[0] || '') === 'true',
+        };
+      })
+      .filter(Boolean);
   } else if (Array.isArray(req.body?.images)) {
-    dataUrls = req.body.images.filter(
-      (u) => typeof u === 'string' && u.startsWith('data:image/')
-    );
+    items = req.body.images
+      .map((entry) => {
+        if (typeof entry === 'string' && entry.startsWith('data:image/')) {
+          return { url: entry, color: null, isPrimary: false };
+        }
+        if (
+          entry &&
+          typeof entry === 'object' &&
+          typeof entry.url === 'string' &&
+          entry.url.startsWith('data:image/')
+        ) {
+          return { url: entry.url, color: entry.color || null, isPrimary: !!entry.isPrimary };
+        }
+        return null;
+      })
+      .filter(Boolean);
   }
 
-  if (dataUrls.length === 0) throw new ApiError(400, 'No images uploaded');
+  if (items.length === 0) throw new ApiError(400, 'No images uploaded');
 
   const product = await prisma.product.findUnique({
     where: { id },
@@ -278,19 +399,33 @@ const uploadImages = asyncHandler(async (req, res) => {
   if (!product) throw new ApiError(404, 'Product not found');
 
   const existing = await prisma.productImage.count({ where: { productId: id } });
+  const newPrimary = items.find((it) => it.isPrimary);
+  const promoteFirst = !newPrimary && existing === 0;
 
-  const created = await prisma.$transaction(
-    dataUrls.map((url, idx) =>
-      prisma.productImage.create({
-        data: {
-          productId: id,
-          url,
-          isPrimary: existing === 0 && idx === 0,
-          order: existing + idx,
-        },
-      })
-    )
-  );
+  const created = await prisma.$transaction(async (tx) => {
+    if (newPrimary) {
+      await tx.productImage.updateMany({
+        where: { productId: id, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+    const rows = [];
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      rows.push(
+        await tx.productImage.create({
+          data: {
+            productId: id,
+            url: item.url,
+            color: item.color || null,
+            isPrimary: item.isPrimary || (promoteFirst && idx === 0),
+            order: existing + idx,
+          },
+        })
+      );
+    }
+    return rows;
+  });
 
   res.json({ success: true, images: created });
 });
@@ -327,6 +462,7 @@ module.exports = {
   byCategory,
   getProduct,
   adminGetProduct,
+  adminListProducts,
   createProduct,
   updateProduct,
   deleteProduct,

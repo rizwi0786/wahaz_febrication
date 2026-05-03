@@ -21,6 +21,13 @@ export const adminApi = api.injectEndpoints({
     }),
 
     // Products
+    adminListProducts: b.query({
+      query: (params = {}) => {
+        const q = new URLSearchParams(params).toString();
+        return `/admin/products${q ? `?${q}` : ''}`;
+      },
+      providesTags: ['Product'],
+    }),
     adminGetProduct: b.query({
       query: (id) => `/admin/products/${id}`,
       providesTags: (r, e, id) => [{ type: 'Product', id }],
@@ -181,6 +188,7 @@ export const {
   useGetRevenueChartQuery,
   useGetTopProductsQuery,
   useGetRecentOrdersQuery,
+  useAdminListProductsQuery,
   useAdminGetProductQuery,
   useCreateProductMutation,
   useUpdateProductMutation,

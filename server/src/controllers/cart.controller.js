@@ -40,6 +40,9 @@ const addToCart = asyncHandler(async (req, res) => {
   if (!variant || variant.productId !== productId) {
     throw new ApiError(404, 'Variant not found for this product');
   }
+  if (!variant.product?.isActive) {
+    throw new ApiError(400, 'This product is no longer available');
+  }
   if (variant.stock < quantity) {
     throw new ApiError(400, `Only ${variant.stock} in stock`);
   }

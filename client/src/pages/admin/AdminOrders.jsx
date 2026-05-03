@@ -4,16 +4,9 @@ import { Search } from 'lucide-react';
 import { useListAllOrdersQuery } from '../../store/api/adminApi';
 import Loader from '../../components/common/Loader';
 import { StatusBadge } from '../../components/common/Badge';
-import { formatCurrency, formatDate } from '../../utils/format';
+import { formatCurrency, formatDate, ORDER_STATUSES, orderStatusLabel } from '../../utils/format';
 
-const STATUSES = [
-  'PROCESSING',
-  'CONFIRMED',
-  'SHIPPED',
-  'OUT_FOR_DELIVERY',
-  'DELIVERED',
-  'CANCELLED',
-];
+const STATUSES = ORDER_STATUSES;
 
 export default function AdminOrders() {
   const [search, setSearch] = useState('');
@@ -49,7 +42,7 @@ export default function AdminOrders() {
           >
             <option value="">All statuses</option>
             {STATUSES.map((s) => (
-              <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+              <option key={s} value={s}>{orderStatusLabel(s)}</option>
             ))}
           </select>
         </div>

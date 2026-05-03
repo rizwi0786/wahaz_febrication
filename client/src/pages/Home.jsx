@@ -19,6 +19,10 @@ const OCCASIONS = [
   { label: 'Casual', query: 'occasion=Casual', img: 'https://picsum.photos/seed/casual/600/800' },
   { label: 'Wedding', query: 'occasion=Wedding', img: 'https://picsum.photos/seed/wedding/600/800' },
   { label: 'Party', query: 'occasion=Party', img: 'https://picsum.photos/seed/party/600/800' },
+  { label: 'Business', query: 'occasion=Business', img: 'https://picsum.photos/seed/business/600/800' },
+  { label: 'Festive', query: 'occasion=Festive', img: 'https://picsum.photos/seed/festive/600/800' },
+  { label: 'Cocktail', query: 'occasion=Cocktail', img: 'https://picsum.photos/seed/cocktail/600/800' },
+  { label: 'Traditional', query: 'occasion=Traditional', img: 'https://picsum.photos/seed/traditional/600/800' },
 ];
 
 const USPS = [
@@ -92,9 +96,9 @@ export default function Home() {
         ) : (
           <div className="section py-16 md:py-24 text-center">
             <h1 className="text-3xl sm:text-4xl md:text-6xl font-serif mb-4">
-              Designer Menswear, Tailored for You
+              Designer Attire. Timeless Impression.
             </h1>
-            <p className="text-white/70 mb-6">Premium fabrics. Refined craftsmanship.</p>
+            <p className="text-white/70 mb-6">Tradition meets contemporary elegance. Crafted for excellence.</p>
             <Link to="/shop" className="btn-secondary inline-flex">
               Shop the Collection
             </Link>
@@ -216,7 +220,7 @@ export default function Home() {
           <h2 className="text-2xl md:text-4xl font-serif mb-2">Shop by Occasion</h2>
           <p className="text-brand-muted text-sm md:text-base">Dressed for the moment</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
           {OCCASIONS.map((o) => (
             <Link
               key={o.label}

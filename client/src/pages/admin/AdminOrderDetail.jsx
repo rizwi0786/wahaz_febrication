@@ -6,18 +6,14 @@ import Loader from '../../components/common/Loader';
 import Button from '../../components/common/Button';
 import { Select, Textarea } from '../../components/common/Input';
 import { StatusBadge } from '../../components/common/Badge';
-import { formatCurrency, formatDateTime } from '../../utils/format';
+import {
+  formatCurrency,
+  formatDateTime,
+  ORDER_STATUSES,
+  orderStatusLabel,
+} from '../../utils/format';
 
-const STATUSES = [
-  'PROCESSING',
-  'CONFIRMED',
-  'SHIPPED',
-  'OUT_FOR_DELIVERY',
-  'DELIVERED',
-  'CANCELLED',
-  'RETURN_REQUESTED',
-  'RETURNED',
-];
+const STATUSES = ORDER_STATUSES;
 
 export default function AdminOrderDetail() {
   const { id } = useParams();
@@ -88,6 +84,26 @@ export default function AdminOrderDetail() {
             </div>
           </div>
 
+          {(order.fitPreference || order.notes) && (
+            <div className="bg-white rounded-lg p-5 border">
+              <h3 className="font-serif text-lg mb-3">Tailoring</h3>
+              <div className="text-sm space-y-2">
+                {order.fitPreference && (
+                  <div>
+                    <span className="text-brand-muted">Fit preference: </span>
+                    <span className="font-medium">{order.fitPreference}</span>
+                  </div>
+                )}
+                {order.notes && (
+                  <div>
+                    <p className="text-brand-muted">Customer notes:</p>
+                    <p className="whitespace-pre-wrap">{order.notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-lg p-5 border">
             <h3 className="font-serif text-lg mb-4">Tracking History</h3>
             <div className="space-y-3">
@@ -95,7 +111,7 @@ export default function AdminOrderDetail() {
                 <div key={t.id} className="flex gap-3 text-sm">
                   <div className="w-2 h-2 rounded-full bg-brand-secondary mt-1.5 shrink-0" />
                   <div>
-                    <p className="font-medium">{t.status.replace(/_/g, ' ')}</p>
+                    <p className="font-medium">{orderStatusLabel(t.status)}</p>
                     <p className="text-brand-muted text-xs">{t.message}</p>
                     <p className="text-xs text-brand-muted">{formatDateTime(t.createdAt)}</p>
                   </div>
@@ -143,7 +159,7 @@ export default function AdminOrderDetail() {
               <Select label="New status" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
                 <option value="">Select status</option>
                 {STATUSES.map((s) => (
-                  <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                  <option key={s} value={s}>{orderStatusLabel(s)}</option>
                 ))}
               </Select>
               <Textarea

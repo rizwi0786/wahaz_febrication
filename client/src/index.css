@@ -13,15 +13,15 @@
     max-width: 100vw;
   }
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Montserrat', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
-    color: #1A1A1A;
+    color: #0D0D0D;
   }
   body {
-    background: #F5F0E8;
+    background: #F5EADF;
   }
   h1, h2, h3, h4 {
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: 'Cinzel', Georgia, serif;
     letter-spacing: -0.01em;
   }
   /* Images should never exceed their container — fixes the gallery
@@ -86,7 +86,7 @@
   height: 10px;
 }
 .hero-swiper .swiper-pagination-bullet-active {
-  background: #B8962E; /* brand.secondary */
+  background: #D4AF37; /* brand.secondary */
   opacity: 1;
   width: 28px;
   border-radius: 999px;
@@ -140,7 +140,7 @@
 }
 .category-swiper .swiper-button-next,
 .category-swiper .swiper-button-prev {
-  color: #1A1A1A;
+  color: #0D0D0D;
   background: rgba(255, 255, 255, 0.92);
   width: 36px;
   height: 36px;

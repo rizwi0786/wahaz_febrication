@@ -11,10 +11,13 @@ import Modal from '../components/common/Modal';
 import { Textarea } from '../components/common/Input';
 import Input from '../components/common/Input';
 import { StatusBadge } from '../components/common/Badge';
-import { formatCurrency, formatDateTime } from '../utils/format';
+import {
+  formatCurrency,
+  formatDateTime,
+  ORDER_TIMELINE,
+  orderStatusLabel,
+} from '../utils/format';
 import { selectCurrentUser } from '../store/slices/authSlice';
-
-const TIMELINE = ['PROCESSING', 'CONFIRMED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
 
 export default function OrderTracking() {
   const { id } = useParams();
@@ -40,7 +43,7 @@ export default function OrderTracking() {
   const order = data?.order;
   if (!order) return <p className="text-center py-24">Order not found</p>;
 
-  const currentIdx = TIMELINE.indexOf(order.orderStatus);
+  const currentIdx = ORDER_TIMELINE.indexOf(order.orderStatus);
 
   const handleCancel = async () => {
     try {
@@ -52,7 +55,7 @@ export default function OrderTracking() {
     }
   };
 
-  const canCancel = ['PROCESSING', 'CONFIRMED'].includes(order.orderStatus);
+  const canCancel = ['ORDER_RECEIVED', 'IN_TAILORING'].includes(order.orderStatus);
   // Backend only accepts reviews for items from orders that are DELIVERED.
   const canReview = order.orderStatus === 'DELIVERED';
 
@@ -95,7 +98,7 @@ export default function OrderTracking() {
       {order.orderStatus !== 'CANCELLED' && (
         <div className="card p-4 sm:p-6 mb-6 overflow-x-auto scrollbar-none">
           <div className="flex items-start justify-between min-w-[520px] md:min-w-0">
-            {TIMELINE.map((status, i) => {
+            {ORDER_TIMELINE.map((status, i) => {
               const done = i <= currentIdx;
               return (
                 <div key={status} className="flex-1 flex items-center">
@@ -105,11 +108,11 @@ export default function OrderTracking() {
                     }`}>
                       {done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
                     </div>
-                    <span className={`text-[10px] md:text-xs mt-1 text-center px-1 ${done ? 'text-brand-primary font-medium' : 'text-gray-400'}`}>
-                      {status.replace(/_/g, ' ')}
+                    <span className={`text-[10px] md:text-xs mt-1 text-center px-1 leading-tight max-w-[90px] ${done ? 'text-brand-primary font-medium' : 'text-gray-400'}`}>
+                      {orderStatusLabel(status)}
                     </span>
                   </div>
-                  {i < TIMELINE.length - 1 && (
+                  {i < ORDER_TIMELINE.length - 1 && (
                     <div className={`flex-1 h-0.5 mx-2 ${i < currentIdx ? 'bg-brand-secondary' : 'bg-gray-200'}`} />
                   )}
                 </div>
@@ -194,6 +197,26 @@ export default function OrderTracking() {
               <p className="text-brand-muted">{order.shippingAddress?.phone}</p>
             </div>
           </div>
+
+          {(order.fitPreference || order.notes) && (
+            <div className="card p-4 sm:p-6">
+              <h3 className="font-serif text-lg mb-3">Tailoring</h3>
+              <div className="text-sm space-y-2">
+                {order.fitPreference && (
+                  <div>
+                    <span className="text-brand-muted">Fit preference: </span>
+                    <span className="font-medium">{order.fitPreference}</span>
+                  </div>
+                )}
+                {order.notes && (
+                  <div>
+                    <p className="text-brand-muted">Notes:</p>
+                    <p className="whitespace-pre-wrap">{order.notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -206,7 +229,7 @@ export default function OrderTracking() {
               <div key={t.id} className="flex gap-3 text-sm">
                 <div className="w-2 h-2 rounded-full bg-brand-secondary mt-1.5 shrink-0" />
                 <div>
-                  <p className="font-medium">{t.status.replace(/_/g, ' ')}</p>
+                  <p className="font-medium">{orderStatusLabel(t.status)}</p>
                   <p className="text-brand-muted text-xs">{t.message}</p>
                   <p className="text-xs text-brand-muted">{formatDateTime(t.createdAt)}</p>
                 </div>

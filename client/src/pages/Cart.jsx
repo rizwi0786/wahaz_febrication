@@ -31,8 +31,11 @@ export default function Cart() {
 
   const cart = data?.cart;
   const items = cart?.items || [];
+  const unavailableItems = items.filter((it) => !it.product?.isActive);
+  const hasUnavailable = unavailableItems.length > 0;
 
   const subtotal = items.reduce((sum, item) => {
+    if (!item.product?.isActive) return sum;
     const price = Number(item.product.discountPrice || item.product.price);
     return sum + price * item.quantity;
   }, 0);
@@ -75,6 +78,10 @@ export default function Cart() {
 
   const handleCheckout = () => {
     if (items.length === 0) return;
+    if (hasUnavailable) {
+      toast.error('Please remove unavailable items before checking out');
+      return;
+    }
     navigate('/checkout', { state: { couponCode: appliedCoupon?.code } });
   };
 
@@ -94,13 +101,24 @@ export default function Cart() {
   return (
     <div className="section py-8">
       <h1 className="text-2xl md:text-3xl font-serif mb-6">Shopping Cart ({items.length})</h1>
+      {hasUnavailable && (
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+          {unavailableItems.length} item(s) in your cart are no longer available. Remove them to continue checkout.
+        </div>
+      )}
       <div className="grid lg:grid-cols-[1fr_400px] gap-6 lg:gap-8">
         {/* Items */}
         <div className="space-y-4">
           {items.map((item) => {
             const price = Number(item.product.discountPrice || item.product.price);
+            const unavailable = !item.product?.isActive;
             return (
-              <div key={item.id} className="card p-3 sm:p-4 flex gap-3 sm:gap-4">
+              <div
+                key={item.id}
+                className={`card p-3 sm:p-4 flex gap-3 sm:gap-4 ${
+                  unavailable ? 'opacity-60 border-red-200' : ''
+                }`}
+              >
                 <Link to={`/product/${item.product.slug}`} className="shrink-0">
                   <img
                     src={item.product.images?.[0]?.url}
@@ -121,6 +139,11 @@ export default function Cart() {
                         {item.variant?.size} · {item.variant?.color}
                       </p>
                       <p className="text-sm font-semibold mt-1">{formatCurrency(price)}</p>
+                      {unavailable && (
+                        <p className="text-xs text-red-600 font-medium mt-1">
+                          No longer available — please remove
+                        </p>
+                      )}
                     </div>
                     <button
                       onClick={() => handleRemove(item.id)}
@@ -133,14 +156,16 @@ export default function Cart() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleQuantity(item, item.quantity - 1)}
-                        className="p-1.5 border border-gray-300 rounded hover:border-brand-primary"
+                        disabled={unavailable}
+                        className="p-1.5 border border-gray-300 rounded hover:border-brand-primary disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Minus size={12} />
                       </button>
                       <span className="w-8 text-center text-sm">{item.quantity}</span>
                       <button
                         onClick={() => handleQuantity(item, item.quantity + 1)}
-                        className="p-1.5 border border-gray-300 rounded hover:border-brand-primary"
+                        disabled={unavailable}
+                        className="p-1.5 border border-gray-300 rounded hover:border-brand-primary disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Plus size={12} />
                       </button>
@@ -203,7 +228,7 @@ export default function Cart() {
             </div>
           </div>
 
-          <Button onClick={handleCheckout} className="w-full mt-6">
+          <Button onClick={handleCheckout} disabled={hasUnavailable} className="w-full mt-6">
             Proceed to Checkout
           </Button>
           <Link to="/shop" className="block text-center text-xs text-brand-muted hover:text-brand-primary mt-3">

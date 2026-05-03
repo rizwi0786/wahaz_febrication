@@ -64,6 +64,8 @@ export const api = createApi({
     'Wishlist',
     'Banner',
     'AdminStats',
+    'CustomOrder',
+    'Consultation',
   ],
   endpoints: () => ({}),
 });

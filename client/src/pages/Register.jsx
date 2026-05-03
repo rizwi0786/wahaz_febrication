@@ -42,7 +42,7 @@ export default function Register() {
     <div className="section py-16 max-w-md">
       <div className="card p-8">
         <h1 className="text-3xl font-serif mb-2 text-center">Create account</h1>
-        <p className="text-sm text-brand-muted text-center mb-6">Join Wahaz Fabrication</p>
+        <p className="text-sm text-brand-muted text-center mb-6">Join Bellissimo Couture</p>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input label="Full name" {...register('name')} error={errors.name?.message} />
           <Input label="Email" type="email" {...register('email')} error={errors.email?.message} />

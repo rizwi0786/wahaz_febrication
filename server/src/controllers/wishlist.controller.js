@@ -9,7 +9,7 @@ const getWishlist = asyncHandler(async (req, res) => {
       product: {
         include: {
           images: { orderBy: { order: 'asc' } },
-          category: { select: { name: true, slug: true } },
+          categories: { select: { name: true, slug: true } },
         },
       },
     },
@@ -24,6 +24,7 @@ const addToWishlist = asyncHandler(async (req, res) => {
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) throw new ApiError(404, 'Product not found');
+  if (!product.isActive) throw new ApiError(400, 'This product is no longer available');
 
   try {
     const item = await prisma.wishlist.create({
