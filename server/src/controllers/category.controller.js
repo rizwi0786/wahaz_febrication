@@ -7,7 +7,10 @@ const { fileToDataUrl } = require('../middleware/upload.middleware');
 const listCategories = asyncHandler(async (req, res) => {
   const categories = await prisma.category.findMany({
     where: { isActive: true },
-    include: { _count: { select: { products: true } } },
+    // Only count active products so the sidebar badge matches what the Shop
+    // listing actually shows (which filters on isActive: true). Inactive /
+    // soft-deleted products must not inflate the badge.
+    include: { _count: { select: { products: { where: { isActive: true } } } } },
     orderBy: { name: 'asc' },
   });
   res.json({ success: true, categories });
@@ -17,7 +20,7 @@ const listCategories = asyncHandler(async (req, res) => {
 const getCategory = asyncHandler(async (req, res) => {
   const category = await prisma.category.findUnique({
     where: { slug: req.params.slug },
-    include: { _count: { select: { products: true } } },
+    include: { _count: { select: { products: { where: { isActive: true } } } } },
   });
   if (!category) throw new ApiError(404, 'Category not found');
   res.json({ success: true, category });
