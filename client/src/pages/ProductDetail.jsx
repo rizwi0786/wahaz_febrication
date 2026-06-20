@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Heart, Share2, Star, Truck, ShieldCheck, RefreshCw, Plus, Minus } from 'lucide-react';
+import { Heart, Share2, Star, Truck, ShieldCheck, RefreshCw, Plus, Minus, X, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useGetProductQuery } from '../store/api/productApi';
 import { useAddToCartMutation } from '../store/api/cartApi';
@@ -27,6 +27,15 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
   const [sizeChartOpen, setSizeChartOpen] = useState(false);
+  const [zoom, setZoom] = useState({ active: false, x: 50, y: 50 });
+  const [fullscreen, setFullscreen] = useState(false);
+
+  const handleZoomMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setZoom({ active: true, x, y });
+  };
 
   const product = data?.product;
   const related = data?.related || [];
@@ -72,6 +81,21 @@ export default function ProductDetail() {
   useEffect(() => {
     setSelectedImage(0);
   }, [galleryImages]);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setFullscreen(false);
+      if (e.key === 'ArrowLeft') setSelectedImage((i) => (i - 1 + galleryImages.length) % galleryImages.length);
+      if (e.key === 'ArrowRight') setSelectedImage((i) => (i + 1) % galleryImages.length);
+    };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [fullscreen, galleryImages.length]);
 
   if (isLoading) return <Loader className="py-24" size="lg" />;
   if (!product) return <p className="text-center py-24">Product not found</p>;
@@ -133,17 +157,11 @@ export default function ProductDetail() {
         <span>/ <span className="text-brand-primary">{product.name}</span></span>
       </nav>
 
-      <div className="grid md:grid-cols-2 gap-6 md:gap-10">
+      <div className="grid md:grid-cols-[auto_1fr] gap-6 md:gap-10">
         {/* Gallery */}
-        <div>
-          <div className="bg-gray-100 rounded-lg overflow-hidden aspect-[4/5] md:aspect-auto md:max-h-[65vh] md:flex md:items-center md:justify-center mb-4">
-            <img
-              src={galleryImages[selectedImage]?.url}
-              alt={product.name}
-              className="w-full h-full object-cover md:object-contain"
-            />
-          </div>
-          <div className="flex gap-3 overflow-x-auto scrollbar-none">
+        <div className="flex flex-col-reverse md:flex-row gap-3 md:gap-4">
+          {/* Thumbnails: horizontal below on mobile, vertical-left on desktop */}
+          <div className="flex md:flex-col gap-3 overflow-x-auto md:overflow-y-auto md:max-h-[calc((100vh-220px)*1.092)] scrollbar-none shrink-0">
             {galleryImages.map((img, i) => (
               <button
                 key={img.id}
@@ -155,6 +173,48 @@ export default function ProductDetail() {
                 <img src={img.url} alt="" className="w-full h-full object-cover" />
               </button>
             ))}
+          </div>
+          {/* Main image + zoom panel */}
+          <div className="relative w-full md:w-[calc((100vh-220px)*0.6615)] mx-auto md:mx-0">
+            <div
+              className="relative bg-gray-100 rounded-lg overflow-hidden aspect-[2/3.3] cursor-pointer md:cursor-zoom-in"
+              onMouseEnter={() => setZoom((z) => ({ ...z, active: true }))}
+              onMouseLeave={() => setZoom({ active: false, x: 50, y: 50 })}
+              onMouseMove={handleZoomMove}
+              onClick={() => setFullscreen(true)}
+            >
+              <img
+                src={galleryImages[selectedImage]?.url}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1 rounded bg-black/50 px-2 py-1 text-[11px] text-white pointer-events-none">
+                <Maximize2 size={12} /> Click to enlarge
+              </div>
+              {zoom.active && (
+                <div
+                  className="hidden md:block absolute pointer-events-none border border-white/80 bg-white/20"
+                  style={{
+                    width: '43%',
+                    height: '43%',
+                    left: `${zoom.x}%`,
+                    top: `${zoom.y}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                />
+              )}
+            </div>
+            {/* Zoom result panel (desktop) */}
+            {zoom.active && (
+              <div
+                className="hidden md:block absolute top-0 left-full ml-4 w-[min(60vh,600px)] h-[min(60vh,600px)] rounded-lg overflow-hidden border border-gray-200 shadow-2xl bg-white bg-no-repeat z-30 pointer-events-none"
+                style={{
+                  backgroundImage: `url(${galleryImages[selectedImage]?.url})`,
+                  backgroundSize: '230%',
+                  backgroundPosition: `${zoom.x}% ${zoom.y}%`,
+                }}
+              />
+            )}
           </div>
         </div>
 
@@ -439,6 +499,74 @@ export default function ProductDetail() {
         onClose={() => setSizeChartOpen(false)}
         productFits={product.fit || []}
       />
+
+      {/* Fullscreen image modal */}
+      {fullscreen && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center select-none"
+          onClick={() => setFullscreen(false)}
+        >
+          <button
+            onClick={() => setFullscreen(false)}
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition"
+            aria-label="Close"
+          >
+            <X size={28} />
+          </button>
+
+          {galleryImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedImage((i) => (i - 1 + galleryImages.length) % galleryImages.length);
+              }}
+              className="absolute left-2 md:left-6 top-1/2 -translate-y-1/2 p-2 text-white/80 hover:text-white transition"
+              aria-label="Previous image"
+            >
+              <ChevronLeft size={40} />
+            </button>
+          )}
+
+          <img
+            src={galleryImages[selectedImage]?.url}
+            alt={product.name}
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-[92vw] max-h-[82vh] object-contain"
+          />
+
+          {galleryImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedImage((i) => (i + 1) % galleryImages.length);
+              }}
+              className="absolute right-2 md:right-6 top-1/2 -translate-y-1/2 p-2 text-white/80 hover:text-white transition"
+              aria-label="Next image"
+            >
+              <ChevronRight size={40} />
+            </button>
+          )}
+
+          {galleryImages.length > 1 && (
+            <div
+              className="absolute bottom-4 flex gap-2 px-4 max-w-full overflow-x-auto scrollbar-none"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {galleryImages.map((img, i) => (
+                <button
+                  key={img.id}
+                  onClick={() => setSelectedImage(i)}
+                  className={`shrink-0 w-12 h-14 rounded overflow-hidden border-2 transition ${
+                    selectedImage === i ? 'border-white' : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Related */}
       {related.length > 0 && (
