@@ -1,10 +1,17 @@
 const rateLimit = require('express-rate-limit');
+const { getClientIp } = require('../utils/clientIp');
+
+// Key by a normalized client IP. Supplying our own keyGenerator also bypasses
+// express-rate-limit's built-in IP check, which otherwise raises
+// ERR_ERL_INVALID_IP_ADDRESS when IIS/ARR sends X-Forwarded-For as "ip:port".
+const ipKey = (req) => getClientIp(req);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 attempts per 15 min
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: ipKey,
   message: { success: false, message: 'Too many attempts. Try again in 15 minutes.' },
 });
 
@@ -13,6 +20,7 @@ const apiLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: ipKey,
   message: { success: false, message: 'Too many requests. Slow down.' },
 });
 
@@ -23,7 +31,7 @@ const paymentVerifyLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.user?.id ? `u:${req.user.id}` : `ip:${req.ip}`),
+  keyGenerator: (req) => (req.user?.id ? `u:${req.user.id}` : `ip:${getClientIp(req)}`),
   message: { success: false, message: 'Too many payment verification attempts.' },
 });
 
@@ -34,6 +42,7 @@ const webhookLimiter = rateLimit({
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: ipKey,
   message: { success: false, message: 'Too many webhook requests.' },
 });
 

@@ -6,6 +6,8 @@ const cookieParser = require('cookie-parser');
 
 const { errorHandler, notFound } = require('./middleware/error.middleware');
 const { apiLimiter, webhookLimiter } = require('./middleware/rateLimiter');
+const logger = require('./config/logger');
+const { getClientIp } = require('./utils/clientIp');
 const orderCtrl = require('./controllers/order.controller');
 
 const authRoutes = require('./routes/auth.routes');
@@ -69,7 +71,19 @@ app.post(
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(cookieParser());
-if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
+
+// HTTP access logging. In dev: colorized console ('dev'). In prod: a concise
+// line with the normalized client IP, piped through winston into the log files.
+morgan.token('clientip', (req) => getClientIp(req));
+if (process.env.NODE_ENV !== 'test') {
+  app.use(
+    process.env.NODE_ENV === 'production'
+      ? morgan(':clientip :method :url :status :res[content-length] - :response-time ms', {
+          stream: logger.stream,
+        })
+      : morgan('dev'),
+  );
+}
 
 // -------- Global rate limiting --------
 app.use('/api', apiLimiter);

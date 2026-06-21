@@ -8,6 +8,7 @@ node_modules/
 # Build output
 dist/
 build/
+*.zip
 
 # IDE / OS
 .DS_Store
@@ -19,7 +20,9 @@ Thumbs.db
 *.swo
 
 # Logs
+logs/
 *.log
+*.log.gz
 npm-debug.log*
 
 # Prisma

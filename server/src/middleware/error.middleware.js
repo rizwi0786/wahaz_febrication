@@ -1,5 +1,7 @@
 const multer = require('multer');
 const { ApiError } = require('../utils/errorHandler');
+const logger = require('../config/logger');
+const { getClientIp } = require('../utils/clientIp');
 
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
@@ -29,6 +31,15 @@ function errorHandler(err, req, res, next) {
   }
 
   if (err instanceof ApiError) {
+    // Operational errors are expected (400/404/etc.) and stay quiet, but a 5xx
+    // ApiError is a real server fault worth recording.
+    if (err.statusCode >= 500) {
+      logger.error(`${req.method} ${req.originalUrl} -> ${err.statusCode} ${err.message}`, {
+        ip: getClientIp(req),
+        userId: req.user?.id,
+        stack: err.stack,
+      });
+    }
     return res.status(err.statusCode).json({
       success: false,
       message: err.message,
@@ -36,7 +47,12 @@ function errorHandler(err, req, res, next) {
     });
   }
 
-  console.error('[error]', err);
+  // Anything reaching here is unexpected — log it with full context + stack.
+  logger.error(`${req.method} ${req.originalUrl} -> ${err.statusCode || 500} ${err.message}`, {
+    ip: getClientIp(req),
+    userId: req.user?.id,
+    stack: err.stack,
+  });
   return res.status(err.statusCode || 500).json({
     success: false,
     message: err.message || 'Internal server error',
