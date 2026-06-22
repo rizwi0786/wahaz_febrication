@@ -12,6 +12,7 @@ const couponCtrl = require('../controllers/coupon.controller');
 const bannerCtrl = require('../controllers/banner.controller');
 const customOrderCtrl = require('../controllers/customOrder.controller');
 const consultationCtrl = require('../controllers/consultation.controller');
+const newsletterCtrl = require('../controllers/newsletter.controller');
 
 // All admin routes are double-protected
 router.use(verifyToken, verifyAdmin);
@@ -76,6 +77,10 @@ router.get('/google/auth-url', consultationCtrl.googleAuthUrl);
 router.get('/google/status', consultationCtrl.googleStatus);
 // NOTE: /google/callback is mounted publicly in app.js because Google
 // redirects the browser to it (no Authorization header).
+
+// ---- Newsletter ----
+router.get('/newsletter', newsletterCtrl.adminListSubscribers);
+router.get('/newsletter/export', newsletterCtrl.adminExportSubscribers);
 
 // ---- Banners ----
 router.get('/banners', bannerCtrl.listAllBanners);

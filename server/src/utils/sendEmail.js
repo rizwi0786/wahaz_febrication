@@ -33,6 +33,11 @@ const COLORS = {
   muted:   '#B6AC9D',
   gold:    '#B89B6E',
   divider: '#2C2622',
+  // The header/footer logo PNGs have a baked-in solid background of #1F2324.
+  // Painting the logo cells this exact color hides the visible "box" so the
+  // logo blends in. If you re-export the logos transparent (or on #0D0D0D),
+  // change this back to COLORS.bg.
+  logoBg:  '#1F2324',
 };
 
 function button(label, href, { color = COLORS.gold, textColor = '#0D0D0D' } = {}) {
@@ -58,9 +63,9 @@ function layout({ previewText = '', bodyHtml }) {
         <td align="center" style="padding:32px 16px">
           <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${COLORS.surface};border-radius:8px;overflow:hidden">
             <tr>
-              <td align="center" style="padding:28px 24px 14px;background:${COLORS.bg}">
+              <td align="center" style="padding:28px 24px 18px;background:${COLORS.logoBg}">
                 <a href="${SITE_URL}" style="text-decoration:none">
-                  <img src="${LOGO_URL}" alt="${BRAND_NAME}" width="220" style="display:block;border:0;outline:none;max-width:240px;height:auto" />
+                  <img src="${LOGO_URL}" alt="${BRAND_NAME}" width="300" style="display:block;margin:0 auto;border:0;outline:none;max-width:320px;height:auto" />
                 </a>
               </td>
             </tr>
@@ -294,6 +299,30 @@ const emailTemplates = {
         <p style="margin:0 0 6px;color:${COLORS.muted};font-size:14px">Requested: <strong style="color:${COLORS.text}">${when}</strong> (${booking.duration} mins)</p>
         ${booking.topic ? `<p style="margin:0 0 6px;color:${COLORS.muted};font-size:14px">Topic: <strong style="color:${COLORS.text}">${booking.topic}</strong></p>` : ''}
         ${booking.notes ? `<p style="background:#231C13;border-left:3px solid ${COLORS.gold};padding:12px 16px;border-radius:4px;margin:14px 0 0;color:${COLORS.text};font-style:italic">${booking.notes}</p>` : ''}
+      `,
+    }),
+  }),
+
+  newsletterWelcome: () => ({
+    subject: `Welcome to ${BRAND_NAME}`,
+    html: layout({
+      previewText: 'Thank you for subscribing — exclusive offers and new arrivals await.',
+      bodyHtml: `
+        <h1 style="font-family:Georgia,serif;font-weight:normal;font-size:24px;margin:0 0 8px;color:${COLORS.text}">You're on the list.</h1>
+        <p style="margin:0 0 14px;color:${COLORS.muted}">Thank you for subscribing to ${BRAND_NAME}. You'll be the first to know about exclusive offers, new arrivals and atelier stories.</p>
+        <p style="margin:0 0 24px">${button('Explore the collection', SITE_URL)}</p>
+        <p style="margin:24px 0 0;color:${COLORS.muted};font-size:13px">— The ${BRAND_NAME} atelier</p>
+      `,
+    }),
+  }),
+
+  newsletterAdminNotice: (email) => ({
+    subject: `New newsletter subscriber`,
+    html: layout({
+      previewText: `New newsletter subscriber: ${email}`,
+      bodyHtml: `
+        <h1 style="font-family:Georgia,serif;font-weight:normal;font-size:24px;margin:0 0 8px;color:${COLORS.text}">New newsletter subscriber</h1>
+        <p style="margin:0 0 6px;color:${COLORS.muted};font-size:14px">Email: <strong style="color:${COLORS.text}">${email}</strong></p>
       `,
     }),
   }),

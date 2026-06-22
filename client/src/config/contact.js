@@ -7,6 +7,10 @@ export const CONTACT_PHONE_TEL = '+917217788633';
 export const CONTACT_WHATSAPP = '917217788633';
 export const WHATSAPP_DEFAULT_MSG = "Hi Bellissimo Couture, I'd like to know more about your services.";
 
+// Social
+export const INSTAGRAM_HANDLE = 'bellissimo_couture';
+export const INSTAGRAM_URL = 'https://www.instagram.com/bellissimo_couture';
+
 // Studio location — used by the "Visit our studio" page.
 // TODO: replace with the real studio address + coordinates.
 export const STUDIO = {

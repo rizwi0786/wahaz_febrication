@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { Truck, Shield, RefreshCw, Award, ChevronRight } from 'lucide-react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation } from 'swiper/modules';
@@ -11,18 +13,21 @@ import {
   useNewArrivalsQuery,
   useListCategoriesQuery,
 } from '../store/api/productApi';
+import { useSubscribeNewsletterMutation } from '../store/api/newsletterApi';
 import ProductCard from '../components/product/ProductCard';
 import { ProductCardSkeleton } from '../components/common/Loader';
 
+// Tile images live in client/public/occasions/<key>.jpg — drop your own photos
+// there using the filename in `key`. `fallback` is shown only until you do.
 const OCCASIONS = [
-  { label: 'Formal', query: 'occasion=Formal', img: 'https://picsum.photos/seed/formal/600/800' },
-  { label: 'Casual', query: 'occasion=Casual', img: 'https://picsum.photos/seed/casual/600/800' },
-  { label: 'Wedding', query: 'occasion=Wedding', img: 'https://picsum.photos/seed/wedding/600/800' },
-  { label: 'Party', query: 'occasion=Party', img: 'https://picsum.photos/seed/party/600/800' },
-  { label: 'Business', query: 'occasion=Business', img: 'https://picsum.photos/seed/business/600/800' },
-  { label: 'Festive', query: 'occasion=Festive', img: 'https://picsum.photos/seed/festive/600/800' },
-  { label: 'Cocktail', query: 'occasion=Cocktail', img: 'https://picsum.photos/seed/cocktail/600/800' },
-  { label: 'Traditional', query: 'occasion=Traditional', img: 'https://picsum.photos/seed/traditional/600/800' },
+  { label: 'Formal', key: 'formal', query: 'occasion=Formal', img: '/occasions/formal.jpg', fallback: 'https://picsum.photos/seed/formal/600/800' },
+  { label: 'Casual', key: 'casual', query: 'occasion=Casual', img: '/occasions/casual.jpg', fallback: 'https://picsum.photos/seed/casual/600/800' },
+  { label: 'Wedding', key: 'wedding', query: 'occasion=Wedding', img: '/occasions/wedding.jpg', fallback: 'https://picsum.photos/seed/wedding/600/800' },
+  { label: 'Party', key: 'party', query: 'occasion=Party', img: '/occasions/party.jpg', fallback: 'https://picsum.photos/seed/party/600/800' },
+  { label: 'Business', key: 'business', query: 'occasion=Business', img: '/occasions/business.jpg', fallback: 'https://picsum.photos/seed/business/600/800' },
+  { label: 'Festive', key: 'festive', query: 'occasion=Festive', img: '/occasions/festive.jpg', fallback: 'https://picsum.photos/seed/festive/600/800' },
+  { label: 'Cocktail', key: 'cocktail', query: 'occasion=Cocktail', img: '/occasions/cocktail.jpg', fallback: 'https://picsum.photos/seed/cocktail/600/800' },
+  { label: 'Traditional', key: 'traditional', query: 'occasion=Traditional', img: '/occasions/traditional.jpg', fallback: 'https://picsum.photos/seed/traditional/600/800' },
 ];
 
 const USPS = [
@@ -37,6 +42,22 @@ export default function Home() {
   const { data: featuredData, isLoading: loadingFeatured } = useFeaturedProductsQuery();
   const { data: newData, isLoading: loadingNew } = useNewArrivalsQuery();
   const { data: catData } = useListCategoriesQuery();
+
+  const [email, setEmail] = useState('');
+  const [subscribe, { isLoading: subscribing }] = useSubscribeNewsletterMutation();
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    const value = email.trim();
+    if (!value) return toast.error('Please enter your email');
+    try {
+      const res = await subscribe({ email: value, source: 'home-footer' }).unwrap();
+      toast.success(res?.message || 'Thank you for subscribing!');
+      setEmail('');
+    } catch (err) {
+      toast.error(err?.data?.message || 'Could not subscribe. Please try again.');
+    }
+  };
 
   // Backend already filters to only active banners (`where: { isActive: true }`)
   // sorted by position, so we can render them all directly.
@@ -227,7 +248,14 @@ export default function Home() {
               to={`/shop?${o.query}`}
               className="group relative aspect-[3/4] overflow-hidden rounded-lg"
             >
-              <img src={o.img} alt={o.label} className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+              <img
+                src={o.img}
+                alt={o.label}
+                onError={(e) => {
+                  if (e.currentTarget.src !== o.fallback) e.currentTarget.src = o.fallback;
+                }}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
               <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 right-4 sm:right-6">
                 <h3 className="text-white font-serif text-lg sm:text-2xl">{o.label}</h3>
@@ -243,13 +271,18 @@ export default function Home() {
         <div className="section text-center">
           <h2 className="text-2xl md:text-4xl font-serif mb-3">Stay in style</h2>
           <p className="text-white/70 mb-6 text-sm md:text-base">Join our newsletter for exclusive offers and new arrivals</p>
-          <form onSubmit={(e) => e.preventDefault()} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+          <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
             <input
               type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
               className="flex-1 bg-white/10 border border-white/20 rounded px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-brand-secondary"
             />
-            <button type="submit" className="btn-secondary">Subscribe</button>
+            <button type="submit" className="btn-secondary" disabled={subscribing}>
+              {subscribing ? 'Subscribing…' : 'Subscribe'}
+            </button>
           </form>
         </div>
       </section>

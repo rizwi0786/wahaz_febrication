@@ -39,7 +39,9 @@ const getStats = asyncHandler(async (req, res) => {
     prisma.user.count({
       where: { role: 'CUSTOMER', createdAt: { gte: thisMonth } },
     }),
-    prisma.order.count({ where: { orderStatus: 'PROCESSING' } }),
+    prisma.order.count({
+      where: { orderStatus: { notIn: ['DELIVERED', 'CANCELLED', 'RETURNED'] } },
+    }),
     prisma.product.count({ where: { isActive: true } }),
     prisma.user.count({ where: { role: 'CUSTOMER' } }),
   ]);

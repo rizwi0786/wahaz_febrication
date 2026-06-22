@@ -440,3 +440,14 @@ model Banner {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 }
+
+model NewsletterSubscriber {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  isActive  Boolean  @default(true) // false once unsubscribed
+  source    String?  // where they signed up, e.g. "home-footer"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}

@@ -23,6 +23,7 @@ const bannerRoutes = require('./routes/banner.routes');
 const adminRoutes = require('./routes/admin.routes');
 const customOrderRoutes = require('./routes/customOrder.routes');
 const consultationRoutes = require('./routes/consultation.routes');
+const newsletterRoutes = require('./routes/newsletter.routes');
 
 const app = express();
 
@@ -107,6 +108,7 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/custom-orders', customOrderRoutes);
 app.use('/api/consultations', consultationRoutes);
+app.use('/api/newsletter', newsletterRoutes);
 // Public Google OAuth callback (browser-redirected by Google after consent)
 app.get(
   '/api/admin/google/callback',

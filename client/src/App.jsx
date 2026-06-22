@@ -42,6 +42,7 @@ import Services from './pages/Services';
 import ScheduleSession from './pages/ScheduleSession';
 import VisitStudio from './pages/VisitStudio';
 import AdminConsultations from './pages/admin/AdminConsultations';
+import AdminNewsletter from './pages/admin/AdminNewsletter';
 
 import { useAuthBootstrap } from './hooks/useAuthBootstrap';
 
@@ -103,6 +104,7 @@ export default function App() {
         <Route path="reviews" element={<AdminReviews />} />
         <Route path="custom-orders" element={<AdminCustomOrders />} />
         <Route path="consultations" element={<AdminConsultations />} />
+        <Route path="newsletter" element={<AdminNewsletter />} />
         <Route path="custom-orders/:id" element={<AdminCustomOrderDetail />} />
       </Route>
 

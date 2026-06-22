@@ -11,6 +11,7 @@ import {
   Star,
   Sparkles,
   CalendarCheck,
+  Mail,
   LogOut,
   ExternalLink,
 } from 'lucide-react';
@@ -27,6 +28,7 @@ const NAV = [
   { to: '/admin/coupons', label: 'Coupons', icon: Tag },
   { to: '/admin/banners', label: 'Banners', icon: Image },
   { to: '/admin/reviews', label: 'Reviews', icon: Star },
+  { to: '/admin/newsletter', label: 'Newsletter', icon: Mail },
 ];
 
 export default function AdminLayout() {

@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom';
-import { Facebook, Instagram, Twitter, Mail, Phone, MapPin, MessageCircle } from 'lucide-react';
+import { Instagram, Mail, Phone, MapPin, MessageCircle } from 'lucide-react';
 import {
   CONTACT_EMAIL,
   CONTACT_PHONE_DISPLAY,
   CONTACT_PHONE_TEL,
   CONTACT_WHATSAPP,
+  INSTAGRAM_HANDLE,
+  INSTAGRAM_URL,
 } from '../../config/contact';
 
 export default function Footer() {
@@ -16,11 +18,15 @@ export default function Footer() {
           <p className="text-sm text-white/70 leading-relaxed">
             Designer Attire. Timeless Impression. Blending Italian finesse with royal heritage.
           </p>
-          <div className="flex gap-3 mt-4">
-            <a href="#" className="hover:text-brand-secondary"><Facebook size={18} /></a>
-            <a href="#" className="hover:text-brand-secondary"><Instagram size={18} /></a>
-            <a href="#" className="hover:text-brand-secondary"><Twitter size={18} /></a>
-          </div>
+          <a
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Follow @${INSTAGRAM_HANDLE} on Instagram`}
+            className="inline-flex items-center gap-2 mt-4 text-sm text-white/70 hover:text-brand-secondary"
+          >
+            <Instagram size={18} /> @{INSTAGRAM_HANDLE}
+          </a>
         </div>
 
         <div>
