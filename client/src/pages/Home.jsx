@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Truck, Shield, RefreshCw, Award, ChevronRight } from 'lucide-react';
+import { Truck, Shield, RefreshCw, Award, ChevronRight, MessageSquare, Ruler, Layers, Scissors } from 'lucide-react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation } from 'swiper/modules';
 import 'swiper/css';
@@ -28,6 +28,15 @@ const OCCASIONS = [
   { label: 'Festive', key: 'festive', query: 'occasion=Festive', img: '/occasions/festive.jpg', fallback: 'https://picsum.photos/seed/festive/600/800' },
   { label: 'Cocktail', key: 'cocktail', query: 'occasion=Cocktail', img: '/occasions/cocktail.jpg', fallback: 'https://picsum.photos/seed/cocktail/600/800' },
   { label: 'Traditional', key: 'traditional', query: 'occasion=Traditional', img: '/occasions/traditional.jpg', fallback: 'https://picsum.photos/seed/traditional/600/800' },
+];
+
+// "The Bellissimo Process" — bespoke journey shown on the home page.
+const PROCESS = [
+  { Icon: MessageSquare, title: 'Consultation', desc: 'We understand your style, occasion, and vision.' },
+  { Icon: Ruler, title: 'Measurement', desc: 'Precise measurements taken by our expert tailors.' },
+  { Icon: Layers, title: 'Fabric Selection', desc: 'Choose from our curated library of premium fabrics.' },
+  { Icon: Scissors, title: 'Crafting', desc: 'Hand-finished by master tailors over several weeks.' },
+  { Icon: Truck, title: 'Delivery', desc: 'Your bespoke garment arrives, perfectly finished.' },
 ];
 
 const USPS = [
@@ -263,6 +272,49 @@ export default function Home() {
               </div>
             </Link>
           ))}
+        </div>
+      </section>
+
+      {/* Our process */}
+      <section className="section py-10 md:py-14">
+        <div className="text-center mb-10 md:mb-12">
+          <p className="text-xs tracking-[0.3em] uppercase text-brand-secondary mb-2">How it works</p>
+          <h2 className="text-2xl md:text-4xl font-serif mb-2">The Bellissimo Process</h2>
+          <p className="text-brand-muted text-sm md:text-base">
+            From first conversation to final fitting — every step designed around you.
+          </p>
+        </div>
+        <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-y-8 gap-x-3 max-w-5xl mx-auto">
+          {PROCESS.map((step, i) => (
+            <li
+              key={step.title}
+              className="relative flex items-start gap-4 lg:flex-col lg:items-center lg:text-center lg:gap-4"
+            >
+              {/* Connector line between steps on the desktop row */}
+              {i < PROCESS.length - 1 && (
+                <span
+                  aria-hidden="true"
+                  className="hidden lg:block absolute top-8 left-1/2 w-full h-px bg-brand-secondary/30"
+                />
+              )}
+              <div className="relative z-10 shrink-0 w-16 h-16 rounded-full bg-white border border-brand-secondary/40 text-brand-secondary flex items-center justify-center shadow-sm">
+                <step.Icon size={24} />
+              </div>
+              <div className="lg:px-1">
+                <div className="flex items-center gap-2 lg:justify-center">
+                  <span className="text-xs font-semibold text-brand-secondary tabular-nums">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <h3 className="font-serif text-lg text-brand-primary">{step.title}</h3>
+                </div>
+                <p className="text-xs md:text-sm text-brand-muted mt-1 leading-relaxed">{step.desc}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center mt-10">
+          <Link to="/services/schedule" className="btn-primary">Book a consultation</Link>
+          <Link to="/services" className="btn-outline">Explore our services</Link>
         </div>
       </section>
 

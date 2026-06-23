@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { Upload, X, Info, Ruler } from "lucide-react";
+import { Upload, X, Info, Ruler, Send, Tag, MessageSquare, ShoppingBag } from "lucide-react";
 import Button from "../components/common/Button";
 import Input from "../components/common/Input";
 import SizeChartModal from "../components/product/SizeChartModal";
@@ -25,6 +25,22 @@ const BOTTOM_FIELDS = [
   { key: "inseam", label: "Inseam (in)" },
   { key: "outseam", label: "Outseam (in)" },
   { key: "legOpening", label: "Leg opening (in)" },
+];
+
+// Visual "how it works" flow shown at the top of the page.
+const HOW_IT_WORKS = [
+  { icon: Send, title: "Submit", desc: "Share your design, fabric photos & measurements." },
+  { icon: Tag, title: "Get a quote", desc: "Our team reviews it and sends you a price." },
+  {
+    icon: MessageSquare,
+    title: "Accept or counter",
+    desc: (
+      <>
+        Accept the quote, or make a <strong>one-time</strong> counter offer.
+      </>
+    ),
+  },
+  { icon: ShoppingBag, title: "Place order", desc: "Once approved, order and pay like any product." },
 ];
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4 MB per image
@@ -114,24 +130,38 @@ export default function CustomOrderNew() {
         review and send you a price quote.
       </p>
 
-      <div className="card p-4 sm:p-6 mb-5 bg-brand-light/50 border border-brand-secondary/20">
-        <div className="flex items-start gap-3">
-          <Info size={18} className="text-brand-secondary shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-medium mb-1">How it works</p>
-            <ol className="list-decimal list-inside space-y-1 text-brand-muted">
-              <li>Submit your design + measurements.</li>
-              <li>Admin sends you a price quote.</li>
-              <li>
-                You can accept the quote, or make a <strong>one-time</strong>{" "}
-                counter offer.
-              </li>
-              <li>
-                Once approved, place the order and pay like any regular order.
-              </li>
-            </ol>
-          </div>
-        </div>
+      <div className="card p-5 sm:p-6 mb-5 bg-brand-light/50 border border-brand-secondary/20">
+        <h2 className="font-serif text-lg mb-6 flex items-center gap-2">
+          <Info size={18} className="text-brand-secondary shrink-0" /> How it works
+        </h2>
+        <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-7 gap-x-3">
+          {HOW_IT_WORKS.map((step, i) => (
+            <li
+              key={step.title}
+              className="relative flex items-start gap-4 lg:flex-col lg:items-center lg:text-center lg:gap-3"
+            >
+              {/* Connector line between steps on the desktop row */}
+              {i < HOW_IT_WORKS.length - 1 && (
+                <span
+                  aria-hidden="true"
+                  className="hidden lg:block absolute top-7 left-1/2 w-full h-px bg-brand-secondary/30"
+                />
+              )}
+              <div className="relative z-10 shrink-0 w-14 h-14 rounded-full bg-white border border-brand-secondary/40 text-brand-secondary flex items-center justify-center shadow-sm">
+                <step.icon size={22} />
+              </div>
+              <div className="lg:px-1">
+                <div className="flex items-center gap-2 lg:justify-center">
+                  <span className="text-xs font-semibold text-brand-secondary tabular-nums">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <h3 className="font-medium text-brand-primary text-sm">{step.title}</h3>
+                </div>
+                <p className="text-xs text-brand-muted mt-1 leading-relaxed">{step.desc}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
 
       {/* Designs */}

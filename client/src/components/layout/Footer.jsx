@@ -83,8 +83,8 @@ export default function Footer() {
         <div className="section flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-white/50">
           <p>© {new Date().getFullYear()} Bellissimo Couture. All rights reserved.</p>
           <div className="flex gap-4">
-            <span>Privacy Policy</span>
-            <span>Terms of Service</span>
+            <Link to="/privacy-policy" className="hover:text-white">Privacy Policy</Link>
+            <Link to="/terms-of-service" className="hover:text-white">Terms of Service</Link>
           </div>
         </div>
       </div>

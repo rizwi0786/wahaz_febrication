@@ -41,6 +41,8 @@ import CustomOrderDetail from './pages/CustomOrderDetail';
 import Services from './pages/Services';
 import ScheduleSession from './pages/ScheduleSession';
 import VisitStudio from './pages/VisitStudio';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 import AdminConsultations from './pages/admin/AdminConsultations';
 import AdminNewsletter from './pages/admin/AdminNewsletter';
 
@@ -70,6 +72,10 @@ export default function App() {
         <Route path="services" element={<Services />} />
         <Route path="services/schedule" element={<ScheduleSession />} />
         <Route path="services/studio" element={<VisitStudio />} />
+
+        {/* Legal */}
+        <Route path="privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="terms-of-service" element={<TermsOfService />} />
 
         {/* Auth (public) */}
         <Route path="login" element={<Login />} />
