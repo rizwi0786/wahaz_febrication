@@ -31,7 +31,10 @@ export function useWishlist() {
 
   return {
     isAuth,
-    count: ids.size,
+    // Gate the count on auth state so the badge reads 0 the instant the user
+    // logs out — independent of when RTK Query evicts the cached wishlist
+    // (a skipped query still returns its last cached data until GC).
+    count: isAuth ? ids.size : 0,
     isWishlisted,
     addToWishlist,
     removeFromWishlist,

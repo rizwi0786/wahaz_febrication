@@ -8,6 +8,10 @@ import { useLogoutMutation } from '../../store/api/authApi';
 import { api } from '../../store/api/baseApi';
 import { useWishlist } from '../../hooks/useWishlist';
 
+// TEMP diagnostic — confirms the browser is running the latest build.
+// Remove once the logout badge issue is verified fixed.
+console.log('%c[Navbar] logout-badge-fix build LOADED', 'color:#0a0;font-weight:bold');
+
 const navItems = [
   { label: 'Home', to: '/' },
   { label: 'Shop', to: '/shop' },
@@ -34,7 +38,11 @@ export default function Navbar() {
   const { data: cartData } = useGetCartQuery(undefined, { skip: !user });
   const [doLogout] = useLogoutMutation();
   const { count: wishlistCount } = useWishlist();
-  const cartCount = cartData?.cart?.items?.reduce((n, i) => n + i.quantity, 0) || 0;
+  // Gate on `user` so the cart badge also clears immediately on logout,
+  // not whenever RTK Query happens to evict the cached cart.
+  const cartCount = user
+    ? cartData?.cart?.items?.reduce((n, i) => n + i.quantity, 0) || 0
+    : 0;
 
   const onSearch = (e) => {
     e.preventDefault();
