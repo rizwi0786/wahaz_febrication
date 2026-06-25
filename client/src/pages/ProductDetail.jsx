@@ -5,7 +5,7 @@ import { Heart, Share2, Star, Truck, ShieldCheck, RefreshCw, Plus, Minus, X, Che
 import toast from 'react-hot-toast';
 import { useGetProductQuery } from '../store/api/productApi';
 import { useAddToCartMutation } from '../store/api/cartApi';
-import { useAddToWishlistMutation } from '../store/api/userApi';
+import { useWishlist } from '../hooks/useWishlist';
 import ProductCard from '../components/product/ProductCard';
 import SizeChartModal from '../components/product/SizeChartModal';
 import Loader from '../components/common/Loader';
@@ -19,7 +19,7 @@ export default function ProductDetail() {
   const isAuth = useSelector(selectIsAuthenticated);
   const { data, isLoading } = useGetProductQuery(slug);
   const [addToCart, { isLoading: adding }] = useAddToCartMutation();
-  const [addToWishlist] = useAddToWishlistMutation();
+  const { isWishlisted, addToWishlist, removeFromWishlist } = useWishlist();
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState('');
@@ -102,6 +102,7 @@ export default function ProductDetail() {
 
   const hasDiscount = product.discountPrice && Number(product.discountPrice) < Number(product.price);
   const displayPrice = hasDiscount ? product.discountPrice : product.price;
+  const wished = isWishlisted(product.id);
 
   const handleAddToCart = async () => {
     if (!isAuth) return navigate('/login');
@@ -126,10 +127,15 @@ export default function ProductDetail() {
   const handleWishlist = async () => {
     if (!isAuth) return navigate('/login');
     try {
-      await addToWishlist(product.id).unwrap();
-      toast.success('Added to wishlist');
+      if (wished) {
+        await removeFromWishlist(product.id).unwrap();
+        toast.success('Removed from wishlist');
+      } else {
+        await addToWishlist(product.id).unwrap();
+        toast.success('Added to wishlist');
+      }
     } catch {
-      toast.error('Failed to add to wishlist');
+      toast.error('Failed to update wishlist');
     }
   };
 
@@ -380,9 +386,10 @@ export default function ProductDetail() {
             <button
               onClick={handleWishlist}
               className="p-3 border border-gray-300 rounded-md hover:border-brand-primary"
-              aria-label="Wishlist"
+              aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}
+              aria-pressed={wished}
             >
-              <Heart size={18} />
+              <Heart size={18} className={wished ? 'fill-brand-secondary text-brand-secondary' : ''} />
             </button>
             <button
               onClick={handleShare}

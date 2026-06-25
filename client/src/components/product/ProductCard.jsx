@@ -1,14 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Heart, Star } from 'lucide-react';
-import { useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
 import { formatCurrency } from '../../utils/format';
-import { selectIsAuthenticated } from '../../store/slices/authSlice';
-import { useAddToWishlistMutation } from '../../store/api/userApi';
+import { useWishlist } from '../../hooks/useWishlist';
 
 export default function ProductCard({ product }) {
-  const isAuth = useSelector(selectIsAuthenticated);
-  const [addToWishlist] = useAddToWishlistMutation();
+  const { isAuth, isWishlisted, addToWishlist, removeFromWishlist } = useWishlist();
+  const wished = isWishlisted(product.id);
 
   const primaryImg = product.images?.[0]?.url;
   const hoverImg = product.images?.[1]?.url || primaryImg;
@@ -18,10 +16,15 @@ export default function ProductCard({ product }) {
     e.preventDefault();
     if (!isAuth) return toast.error('Please sign in to add to wishlist');
     try {
-      await addToWishlist(product.id).unwrap();
-      toast.success('Added to wishlist');
+      if (wished) {
+        await removeFromWishlist(product.id).unwrap();
+        toast.success('Removed from wishlist');
+      } else {
+        await addToWishlist(product.id).unwrap();
+        toast.success('Added to wishlist');
+      }
     } catch {
-      toast.error('Failed to add to wishlist');
+      toast.error('Failed to update wishlist');
     }
   };
 
@@ -57,9 +60,13 @@ export default function ProductCard({ product }) {
         <button
           onClick={handleWishlist}
           className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-white rounded-full shadow transition"
-          aria-label="Add to wishlist"
+          aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}
+          aria-pressed={wished}
         >
-          <Heart size={16} className="text-brand-primary" />
+          <Heart
+            size={16}
+            className={wished ? 'fill-brand-secondary text-brand-secondary' : 'text-brand-primary'}
+          />
         </button>
       </div>
 

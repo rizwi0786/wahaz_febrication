@@ -5,6 +5,7 @@ import { ShoppingBag, Heart, User, Search, Menu, X, LogOut, ChevronDown } from '
 import { selectCurrentUser, logOut } from '../../store/slices/authSlice';
 import { useGetCartQuery } from '../../store/api/cartApi';
 import { useLogoutMutation } from '../../store/api/authApi';
+import { useWishlist } from '../../hooks/useWishlist';
 
 const navItems = [
   { label: 'Home', to: '/' },
@@ -31,6 +32,7 @@ export default function Navbar() {
 
   const { data: cartData } = useGetCartQuery(undefined, { skip: !user });
   const [doLogout] = useLogoutMutation();
+  const { count: wishlistCount } = useWishlist();
   const cartCount = cartData?.cart?.items?.reduce((n, i) => n + i.quantity, 0) || 0;
 
   const onSearch = (e) => {
@@ -131,8 +133,13 @@ export default function Navbar() {
             />
           </form>
 
-          <Link to="/wishlist" className="p-2 hover:text-brand-secondary transition" aria-label="Wishlist">
+          <Link to="/wishlist" className="relative p-2 hover:text-brand-secondary transition" aria-label="Wishlist">
             <Heart size={20} />
+            {wishlistCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-brand-secondary text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                {wishlistCount}
+              </span>
+            )}
           </Link>
 
           <Link to="/cart" className="relative p-2 hover:text-brand-secondary transition" aria-label="Cart">
