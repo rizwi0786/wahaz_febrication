@@ -5,6 +5,7 @@ import { ShoppingBag, Heart, User, Search, Menu, X, LogOut, ChevronDown } from '
 import { selectCurrentUser, logOut } from '../../store/slices/authSlice';
 import { useGetCartQuery } from '../../store/api/cartApi';
 import { useLogoutMutation } from '../../store/api/authApi';
+import { api } from '../../store/api/baseApi';
 import { useWishlist } from '../../hooks/useWishlist';
 
 const navItems = [
@@ -46,6 +47,10 @@ export default function Navbar() {
   const handleLogout = async () => {
     await doLogout().unwrap().catch(() => {});
     dispatch(logOut());
+    // Wipe the RTK Query cache so wishlist/cart badge counts (and any other
+    // cached user data) clear immediately. Skipping the queries on logout
+    // stops refetching but leaves the old data in cache until a full refresh.
+    dispatch(api.util.resetApiState());
     navigate('/');
   };
 

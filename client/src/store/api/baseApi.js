@@ -20,14 +20,17 @@ const rawBaseQuery = fetchBaseQuery({
  */
 let refreshPromise = null;
 
-const baseQueryWithReauth = async (args, api, extraOptions) => {
-  let result = await rawBaseQuery(args, api, extraOptions);
+// `apiCtx` is the per-request BaseQueryApi (dispatch/getState/signal). It is
+// named distinctly so it doesn't shadow the exported `api` instance below,
+// which we need to reach `api.util.resetApiState()` on session expiry.
+const baseQueryWithReauth = async (args, apiCtx, extraOptions) => {
+  let result = await rawBaseQuery(args, apiCtx, extraOptions);
 
   if (result.error?.status === 401) {
     if (!refreshPromise) {
       refreshPromise = rawBaseQuery(
         { url: '/auth/refresh-token', method: 'POST' },
-        api,
+        apiCtx,
         extraOptions
       ).finally(() => {
         // clear after the next microtask so concurrent callers see the same result
@@ -39,10 +42,13 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
     const refreshResult = await refreshPromise;
 
     if (refreshResult.data?.accessToken) {
-      api.dispatch(setAccessToken(refreshResult.data.accessToken));
-      result = await rawBaseQuery(args, api, extraOptions);
+      apiCtx.dispatch(setAccessToken(refreshResult.data.accessToken));
+      result = await rawBaseQuery(args, apiCtx, extraOptions);
     } else {
-      api.dispatch(logOut());
+      apiCtx.dispatch(logOut());
+      // Session is gone — clear cached user data (wishlist/cart counts, etc.)
+      // so stale badges don't linger, matching the manual-logout path.
+      apiCtx.dispatch(api.util.resetApiState());
     }
   }
   return result;
