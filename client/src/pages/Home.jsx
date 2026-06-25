@@ -276,7 +276,7 @@ export default function Home() {
       </section>
 
       {/* Our process */}
-      <section className="section py-10 md:py-14">
+      <section className="section pt-10 md:pt-14 pb-6 md:pb-8">
         <div className="text-center mb-10 md:mb-12">
           <p className="text-xs tracking-[0.3em] uppercase text-brand-secondary mb-2">How it works</p>
           <h2 className="text-2xl md:text-4xl font-serif mb-2">The Bellissimo Process</h2>
@@ -318,9 +318,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="bg-brand-primary text-white py-14 md:py-20 mt-10">
-        <div className="section text-center">
+      {/* Newsletter — contained card. Negative bottom margin pulls the
+          shared footer (mt-20) up so the card sits close to it on the home
+          page only, without touching the global footer spacing. */}
+      <section className="section pb-4 md:pb-6 -mb-16 md:-mb-20">
+        <div className="bg-brand-primary text-white rounded-3xl px-6 py-12 md:py-14 text-center">
           <h2 className="text-2xl md:text-4xl font-serif mb-3">Stay in style</h2>
           <p className="text-white/70 mb-6 text-sm md:text-base">Join our newsletter for exclusive offers and new arrivals</p>
           <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
