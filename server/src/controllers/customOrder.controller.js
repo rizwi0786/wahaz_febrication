@@ -210,7 +210,12 @@ const placeCustomOrder = asyncHandler(async (req, res) => {
         paymentMethod,
         paymentStatus: 'PENDING',
         razorpayOrderId: razorpayOrder?.id,
-        orderStatus: paymentMethod === 'COD' ? 'CONFIRMED' : 'PROCESSING',
+        // OrderStatus enum has no CONFIRMED/PROCESSING — those were template
+        // leftovers and made prisma.order.create throw a validation error.
+        // A freshly placed order starts at ORDER_RECEIVED, same as the regular
+        // checkout flow (order.controller.js). Payment state is tracked
+        // separately in paymentStatus.
+        orderStatus: 'ORDER_RECEIVED',
         subtotal,
         discount: 0,
         shippingCharge,
@@ -232,7 +237,7 @@ const placeCustomOrder = asyncHandler(async (req, res) => {
           ],
         },
         tracking: {
-          create: { status: 'PROCESSING', message: 'Custom order received' },
+          create: { status: 'ORDER_RECEIVED', message: 'Custom order received' },
         },
       },
       include: { items: true },
