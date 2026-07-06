@@ -89,12 +89,14 @@ export default function VisitStudio() {
           <Button onClick={useMyLocation} loading={locating} className="w-full mb-2">
             <Navigation size={16} /> Get directions from my location
           </Button>
-          <button
-            onClick={() => openDirections()}
+          <a
+            href={STUDIO.mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-full inline-flex items-center justify-center gap-2 text-sm text-brand-secondary hover:underline py-2"
           >
             <ExternalLink size={14} /> Open in Google Maps
-          </button>
+          </a>
 
           <p className="text-xs text-brand-muted mt-4">
             We'll ask for your browser's location so Google Maps can plot the best route.
