@@ -12,13 +12,12 @@ export const INSTAGRAM_HANDLE = 'bellissimo_couture';
 export const INSTAGRAM_URL = 'https://www.instagram.com/bellissimo_couture';
 
 // Studio location — used by the "Visit our studio" page.
-// TODO: replace with the real studio address + coordinates.
+// Coordinates from the studio's Google Maps listing (Bellissimo Couture, Punjabi Bagh).
 export const STUDIO = {
   name: 'Bellissimo Couture Studio',
-  address: 'New Delhi, India',
-  // Default fallback coords (Connaught Place, New Delhi). Change to actual shop coords.
-  lat: 28.6315,
-  lng: 77.2167,
+  address: 'Punjabi Bagh, New Delhi, Delhi 110034',
+  lat: 28.6835098,
+  lng: 77.1411708,
 };
 
 export const mapsDirectionsUrl = ({ originLat, originLng } = {}) => {

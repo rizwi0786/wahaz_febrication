@@ -7,6 +7,7 @@ import {
   CONTACT_WHATSAPP,
   INSTAGRAM_HANDLE,
   INSTAGRAM_URL,
+  STUDIO,
 } from '../../config/contact';
 
 export default function Footer() {
@@ -54,7 +55,7 @@ export default function Footer() {
           <h4 className="font-medium mb-4 text-brand-secondary">Contact</h4>
           <ul className="space-y-3 text-sm text-white/70">
             <li className="flex items-start gap-2">
-              <MapPin size={16} className="mt-0.5 shrink-0" /> New Delhi, India
+              <MapPin size={16} className="mt-0.5 shrink-0" /> {STUDIO.address}
             </li>
             <li className="flex items-center gap-2">
               <Phone size={16} />

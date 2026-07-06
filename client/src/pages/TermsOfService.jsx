@@ -148,7 +148,7 @@ export default function TermsOfService() {
             </a>
           </li>
           <li>Phone: {CONTACT_PHONE_DISPLAY}</li>
-          <li>Bellissimo Couture, New Delhi, India</li>
+          <li>Bellissimo Couture, Punjabi Bagh, New Delhi, Delhi 110034, India</li>
         </LegalList>
       </LegalSection>
     </LegalPage>
