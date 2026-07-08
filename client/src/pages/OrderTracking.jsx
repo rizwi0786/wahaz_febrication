@@ -169,10 +169,17 @@ export default function OrderTracking() {
                 <span className="text-brand-muted">Shipping</span>
                 <span>{formatCurrency(order.shippingCharge)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-brand-muted">Tax</span>
-                <span>{formatCurrency(order.tax)}</span>
-              </div>
+              {Number(order.tax) > 0 ? (
+                <div className="flex justify-between">
+                  <span className="text-brand-muted">Tax</span>
+                  <span>{formatCurrency(order.tax)}</span>
+                </div>
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-brand-muted">GST (18%)</span>
+                  <span className="text-green-700 font-medium">FREE</span>
+                </div>
+              )}
               <div className="flex justify-between pt-2 border-t font-semibold text-base">
                 <span>Total</span>
                 <span>{formatCurrency(order.total)}</span>

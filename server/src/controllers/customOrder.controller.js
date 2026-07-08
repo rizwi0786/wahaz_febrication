@@ -6,7 +6,9 @@ const { sendEmail } = require('../utils/sendEmail');
 
 const SHIPPING_FREE_ABOVE = 999;
 const SHIPPING_CHARGE = 99;
-const TAX_RATE = 0.18;
+// GST promo: we absorb the 18% GST for now (see order.controller.js).
+// Restore to 0.18 when GST collection resumes.
+const TAX_RATE = 0;
 
 function generateRequestNumber() {
   const ts = Date.now().toString(36).toUpperCase();

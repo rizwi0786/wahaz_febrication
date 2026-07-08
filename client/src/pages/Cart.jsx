@@ -43,8 +43,10 @@ export default function Cart() {
   const discount = appliedCoupon?.discount || 0;
   const discountedSubtotal = Math.max(0, subtotal - discount);
   const shipping = discountedSubtotal >= SHIPPING_FREE_ABOVE ? 0 : SHIPPING_CHARGE;
-  const tax = discountedSubtotal * TAX_RATE;
-  const total = discountedSubtotal + shipping + tax;
+  // GST promo: the 18% GST is on us — computed only to show the savings,
+  // never charged. Must match TAX_RATE = 0 in server/order.controller.js.
+  const gstWaived = discountedSubtotal * TAX_RATE;
+  const total = discountedSubtotal + shipping;
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -219,9 +221,17 @@ export default function Cart() {
               <span>{shipping === 0 ? 'Free' : formatCurrency(shipping)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-brand-muted">Tax (18%)</span>
-              <span>{formatCurrency(tax)}</span>
+              <span className="text-brand-muted">GST (18%)</span>
+              <span>
+                <span className="line-through text-brand-muted mr-1.5">{formatCurrency(gstWaived)}</span>
+                <span className="text-green-700 font-medium">FREE</span>
+              </span>
             </div>
+            {gstWaived > 0 && (
+              <p className="text-xs text-green-700">
+                🎉 GST is on us — you save {formatCurrency(gstWaived)}
+              </p>
+            )}
             <div className="flex justify-between pt-3 border-t text-base font-semibold">
               <span>Total</span>
               <span>{formatCurrency(total)}</span>

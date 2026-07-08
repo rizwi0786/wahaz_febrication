@@ -68,8 +68,10 @@ export default function Checkout() {
   const discount = coupon?.discount || 0;
   const discountedSub = Math.max(0, subtotal - discount);
   const shipping = discountedSub >= 999 ? 0 : 99;
-  const tax = discountedSub * 0.18;
-  const total = discountedSub + shipping + tax;
+  // GST promo: the 18% GST is on us — computed only to show the savings,
+  // never charged. Must match TAX_RATE = 0 in server/order.controller.js.
+  const gstWaived = discountedSub * 0.18;
+  const total = discountedSub + shipping;
 
   const selectedAddress =
     addresses.find((a) => a.id === selectedAddressId) || addresses.find((a) => a.isDefault);
@@ -448,9 +450,17 @@ export default function Checkout() {
               <span>{shipping === 0 ? 'Free' : formatCurrency(shipping)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-brand-muted">Tax (18%)</span>
-              <span>{formatCurrency(tax)}</span>
+              <span className="text-brand-muted">GST (18%)</span>
+              <span>
+                <span className="line-through text-brand-muted mr-1.5">{formatCurrency(gstWaived)}</span>
+                <span className="text-green-700 font-medium">FREE</span>
+              </span>
             </div>
+            {gstWaived > 0 && (
+              <p className="text-xs text-green-700">
+                🎉 GST is on us — you save {formatCurrency(gstWaived)}
+              </p>
+            )}
             <div className="flex justify-between pt-3 border-t font-semibold text-base">
               <span>Total</span>
               <span>{formatCurrency(total)}</span>

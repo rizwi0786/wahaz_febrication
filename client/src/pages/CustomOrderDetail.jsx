@@ -203,7 +203,7 @@ export default function CustomOrderDetail() {
           <p className="text-sm mb-3">
             Final price: <strong>{formatCurrency(co.finalPrice)}</strong> × {co.quantity} ={' '}
             <strong>{formatCurrency(Number(co.finalPrice) * co.quantity)}</strong>
-            <span className="text-xs text-brand-muted"> (shipping + tax added at checkout)</span>
+            <span className="text-xs text-brand-muted"> (shipping added at checkout — GST is on us)</span>
           </p>
 
           <div className="mb-3">

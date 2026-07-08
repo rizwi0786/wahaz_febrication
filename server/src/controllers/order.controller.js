@@ -6,7 +6,11 @@ const { sendEmail, emailTemplates } = require("../utils/sendEmail");
 
 const SHIPPING_FREE_ABOVE = 999;
 const SHIPPING_CHARGE = 99;
-const TAX_RATE = 0.18;
+// GST promo: we absorb the 18% GST for now — orders charge 0 tax and the
+// storefront shows the waived amount as customer savings ("GST on us").
+// Restore to 0.18 when GST collection resumes; the storefront display in
+// Cart.jsx/Checkout.jsx must be switched back at the same time.
+const TAX_RATE = 0;
 
 function generateOrderNumber() {
   const ts = Date.now().toString(36).toUpperCase();
