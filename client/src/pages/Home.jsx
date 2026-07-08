@@ -46,10 +46,35 @@ const USPS = [
   { Icon: Shield, title: 'Secure Payment', desc: '100% protected checkout' },
 ];
 
+// Shown in place of a product grid when its query fails — an explicit retry
+// beats the silent skeletons that used to make API failures invisible.
+function SectionError({ onRetry }) {
+  return (
+    <div className="text-center py-10">
+      <p className="text-brand-muted text-sm mb-4">
+        Couldn't load this section. Please check your connection and try again.
+      </p>
+      <button type="button" onClick={onRetry} className="btn-secondary inline-flex text-sm">
+        Try Again
+      </button>
+    </div>
+  );
+}
+
 export default function Home() {
   const { data: bannerData } = useListBannersQuery();
-  const { data: featuredData, isLoading: loadingFeatured } = useFeaturedProductsQuery();
-  const { data: newData, isLoading: loadingNew } = useNewArrivalsQuery();
+  const {
+    data: featuredData,
+    isLoading: loadingFeatured,
+    isError: errorFeatured,
+    refetch: refetchFeatured,
+  } = useFeaturedProductsQuery();
+  const {
+    data: newData,
+    isLoading: loadingNew,
+    isError: errorNew,
+    refetch: refetchNew,
+  } = useNewArrivalsQuery();
   const { data: catData } = useListCategoriesQuery();
 
   const [email, setEmail] = useState('');
@@ -215,6 +240,8 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)}
           </div>
+        ) : errorNew ? (
+          <SectionError onRetry={refetchNew} />
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {newArrivals.slice(0, 8).map((p) => <ProductCard key={p.id} product={p} />)}
@@ -237,6 +264,8 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)}
           </div>
+        ) : errorFeatured ? (
+          <SectionError onRetry={refetchFeatured} />
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {featured.slice(0, 8).map((p) => <ProductCard key={p.id} product={p} />)}

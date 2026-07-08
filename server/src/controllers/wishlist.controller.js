@@ -1,5 +1,6 @@
 const prisma = require('../config/db');
 const { ApiError, asyncHandler } = require('../utils/errorHandler');
+const { productImageSelect, mapProductImages } = require('../utils/imageUrls');
 
 // GET /api/wishlist
 const getWishlist = asyncHandler(async (req, res) => {
@@ -8,14 +9,18 @@ const getWishlist = asyncHandler(async (req, res) => {
     include: {
       product: {
         include: {
-          images: { orderBy: { order: 'asc' } },
+          // Blob-free image rows; responses link to /api/images/product/<id>.
+          images: { orderBy: { order: 'asc' }, select: productImageSelect },
           categories: { select: { name: true, slug: true } },
         },
       },
     },
     orderBy: { createdAt: 'desc' },
   });
-  res.json({ success: true, wishlist });
+  res.json({
+    success: true,
+    wishlist: wishlist.map((item) => ({ ...item, product: mapProductImages(item.product) })),
+  });
 });
 
 // POST /api/wishlist/:productId

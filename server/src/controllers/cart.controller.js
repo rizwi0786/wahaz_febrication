@@ -1,11 +1,15 @@
 const prisma = require('../config/db');
 const { ApiError, asyncHandler } = require('../utils/errorHandler');
+const { productImageSelect, mapProductImages } = require('../utils/imageUrls');
 
 const cartInclude = {
   items: {
     include: {
       product: {
-        include: { images: { where: { isPrimary: true }, take: 1 } },
+        // Blob-free image rows; responses link to /api/images/product/<id>.
+        include: {
+          images: { where: { isPrimary: true }, take: 1, select: productImageSelect },
+        },
       },
       variant: true,
     },
@@ -20,10 +24,18 @@ async function ensureCart(userId) {
   return cart;
 }
 
+function mapCart(cart) {
+  if (!cart || !Array.isArray(cart.items)) return cart;
+  return {
+    ...cart,
+    items: cart.items.map((item) => ({ ...item, product: mapProductImages(item.product) })),
+  };
+}
+
 // GET /api/cart
 const getCart = asyncHandler(async (req, res) => {
   const cart = await ensureCart(req.user.id);
-  res.json({ success: true, cart });
+  res.json({ success: true, cart: mapCart(cart) });
 });
 
 // POST /api/cart  body: { productId, variantId, quantity }
@@ -78,7 +90,7 @@ const addToCart = asyncHandler(async (req, res) => {
   }
 
   const updated = await ensureCart(req.user.id);
-  res.json({ success: true, cart: updated });
+  res.json({ success: true, cart: mapCart(updated) });
 });
 
 // PUT /api/cart/:itemId  body: { quantity }
@@ -104,7 +116,7 @@ const updateItem = asyncHandler(async (req, res) => {
   });
 
   const cart = await ensureCart(req.user.id);
-  res.json({ success: true, cart });
+  res.json({ success: true, cart: mapCart(cart) });
 });
 
 // DELETE /api/cart/:itemId
@@ -120,7 +132,7 @@ const removeItem = asyncHandler(async (req, res) => {
   await prisma.cartItem.delete({ where: { id: itemId } });
 
   const cart = await ensureCart(req.user.id);
-  res.json({ success: true, cart });
+  res.json({ success: true, cart: mapCart(cart) });
 });
 
 // DELETE /api/cart

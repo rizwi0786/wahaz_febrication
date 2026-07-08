@@ -1,14 +1,29 @@
 const prisma = require('../config/db');
 const { ApiError, asyncHandler } = require('../utils/errorHandler');
 const { fileToDataUrl } = require('../middleware/upload.middleware');
+const { mapBanner, mapBanners } = require('../utils/imageUrls');
+
+// Never select the base64 blobs for lists — responses carry
+// /api/images/banner/<id>?v=<updatedAt> links instead (utils/imageUrls.js).
+const bannerSelect = {
+  id: true,
+  title: true,
+  subtitle: true,
+  link: true,
+  position: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+};
 
 // GET /api/banners
 const listActiveBanners = asyncHandler(async (req, res) => {
   const banners = await prisma.banner.findMany({
     where: { isActive: true },
     orderBy: { position: 'asc' },
+    select: bannerSelect,
   });
-  res.json({ success: true, banners });
+  res.json({ success: true, banners: mapBanners(banners) });
 });
 
 // -------------------- ADMIN --------------------
@@ -22,8 +37,11 @@ function resolveImage(req) {
 }
 
 const listAllBanners = asyncHandler(async (req, res) => {
-  const banners = await prisma.banner.findMany({ orderBy: { position: 'asc' } });
-  res.json({ success: true, banners });
+  const banners = await prisma.banner.findMany({
+    orderBy: { position: 'asc' },
+    select: bannerSelect,
+  });
+  res.json({ success: true, banners: mapBanners(banners) });
 });
 
 const createBanner = asyncHandler(async (req, res) => {
@@ -43,7 +61,7 @@ const createBanner = asyncHandler(async (req, res) => {
       image,
     },
   });
-  res.status(201).json({ success: true, banner });
+  res.status(201).json({ success: true, banner: mapBanner(banner) });
 });
 
 const updateBanner = asyncHandler(async (req, res) => {
@@ -63,7 +81,7 @@ const updateBanner = asyncHandler(async (req, res) => {
   if (image) data.image = image;
 
   const banner = await prisma.banner.update({ where: { id }, data });
-  res.json({ success: true, banner });
+  res.json({ success: true, banner: mapBanner(banner) });
 });
 
 const deleteBanner = asyncHandler(async (req, res) => {

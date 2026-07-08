@@ -77,6 +77,7 @@ model Category {
   image       String?   @db.Text // base64 data URL or remote URL
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt // versions the /api/images/category URL
   products    Product[] @relation("ProductCategories")
 }
 
@@ -439,6 +440,7 @@ model Banner {
   position    Int      @default(0)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt // versions the /api/images/banner URL
 }
 
 model NewsletterSubscriber {

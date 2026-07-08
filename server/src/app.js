@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 
 const { errorHandler, notFound } = require('./middleware/error.middleware');
-const { apiLimiter, webhookLimiter } = require('./middleware/rateLimiter');
+const { apiLimiter, webhookLimiter, imageLimiter } = require('./middleware/rateLimiter');
 const logger = require('./config/logger');
 const { getClientIp } = require('./utils/clientIp');
 const orderCtrl = require('./controllers/order.controller');
@@ -24,6 +24,7 @@ const adminRoutes = require('./routes/admin.routes');
 const customOrderRoutes = require('./routes/customOrder.routes');
 const consultationRoutes = require('./routes/consultation.routes');
 const newsletterRoutes = require('./routes/newsletter.routes');
+const imageRoutes = require('./routes/image.routes');
 
 const app = express();
 
@@ -51,9 +52,28 @@ if (process.env.NODE_ENV === 'production' && process.env.FORCE_HTTPS !== 'false'
   });
 }
 
+// CLIENT_URL may hold several comma-separated origins. For every configured
+// origin we also allow its www./bare twin — visitors reaching the site via
+// www.bellissimo-couture.shop must not have every API call CORS-blocked.
+const allowedOrigins = new Set();
+for (const raw of (process.env.CLIENT_URL || 'http://localhost:5173').split(',')) {
+  const origin = raw.trim().replace(/\/$/, '');
+  if (!origin) continue;
+  allowedOrigins.add(origin);
+  try {
+    const u = new URL(origin);
+    const twinHost = u.hostname.startsWith('www.') ? u.hostname.slice(4) : `www.${u.hostname}`;
+    allowedOrigins.add(`${u.protocol}//${twinHost}${u.port ? `:${u.port}` : ''}`);
+  } catch {
+    /* malformed origin in env — keep the literal value only */
+  }
+}
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    // cb(null, false) leaves the ACAO header off (browser blocks) without
+    // turning unknown origins into 500s.
+    origin: (origin, cb) => cb(null, !origin || allowedOrigins.has(origin)),
     credentials: true,
   })
 );
@@ -85,6 +105,11 @@ if (process.env.NODE_ENV !== 'test') {
       : morgan('dev'),
   );
 }
+
+// Image bytes decoded from the DB blobs. Mounted BEFORE the global /api
+// limiter with a more generous one of its own — a single page view loads
+// dozens of images and must not eat into (or trip) the JSON API budget.
+app.use('/api/images', imageLimiter, imageRoutes);
 
 // -------- Global rate limiting --------
 app.use('/api', apiLimiter);

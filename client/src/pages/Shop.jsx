@@ -49,7 +49,7 @@ export default function Shop() {
     setSearchParams(clean, { replace: true });
   };
 
-  const { data, isFetching } = useListProductsQuery(filters);
+  const { data, isFetching, isError, refetch } = useListProductsQuery(filters);
   const products = data?.products || [];
   const total = data?.total || 0;
   const page = Math.max(1, Number(filters.page) || 1);
@@ -121,7 +121,18 @@ export default function Shop() {
             </div>
           </div>
 
-          <ProductGrid products={products} loading={isFetching} />
+          {isError && !isFetching ? (
+            <div className="text-center py-16">
+              <p className="text-brand-muted text-sm mb-4">
+                Couldn't load products. Please check your connection and try again.
+              </p>
+              <button type="button" onClick={refetch} className="btn-secondary inline-flex text-sm">
+                Try Again
+              </button>
+            </div>
+          ) : (
+            <ProductGrid products={products} loading={isFetching} />
+          )}
 
           {totalPages > 1 && (
             <nav className="flex items-center justify-center gap-1 mt-8" aria-label="Pagination">

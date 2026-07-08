@@ -139,7 +139,7 @@ npm install
 
 # Create your environment file
 cp .env.example .env
-# Set VITE_API_URL=http://localhost:5000/api
+# Keep VITE_API_URL=/api — the Vite dev server proxies /api to :5000
 
 # Start the dev server
 npm run dev
@@ -176,7 +176,7 @@ npm run dev
 
 | Variable | Description |
 |---|---|
-| `VITE_API_URL` | Backend API base URL |
+| `VITE_API_URL` | Backend API base URL — keep it relative (`/api`) so requests stay same-origin (no CORS) |
 | `VITE_RAZORPAY_KEY_ID` | Razorpay public key |
 
 ---

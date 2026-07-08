@@ -49,6 +49,18 @@ const apiLimiter = rateLimit({
   message: { success: false, message: 'Too many requests. Slow down.' },
 });
 
+// Image endpoint: every product card/banner/category tile is one request, so
+// a normal browsing session fires far more of these than JSON calls. Cheap
+// single-row reads + long browser/CDN caching keep the real load low.
+const imageLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: ipKey,
+  message: { success: false, message: 'Too many requests. Slow down.' },
+});
+
 // Verify-payment is sensitive: an attacker who guesses payment IDs/signatures
 // shouldn't get unlimited tries. Keyed by user when authenticated, IP otherwise.
 const paymentVerifyLimiter = rateLimit({
@@ -71,4 +83,11 @@ const webhookLimiter = rateLimit({
   message: { success: false, message: 'Too many webhook requests.' },
 });
 
-module.exports = { authLimiter, loginLimiter, apiLimiter, paymentVerifyLimiter, webhookLimiter };
+module.exports = {
+  authLimiter,
+  loginLimiter,
+  apiLimiter,
+  imageLimiter,
+  paymentVerifyLimiter,
+  webhookLimiter,
+};

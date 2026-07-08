@@ -3,21 +3,32 @@ const prisma = require('../config/db');
 const { ApiError, asyncHandler } = require('../utils/errorHandler');
 const { buildProductQuery } = require('../utils/apiFeatures');
 const { fileToDataUrl } = require('../middleware/upload.middleware');
+const {
+  productImageSelect,
+  productImageUrl,
+  mapProductImages,
+  mapProducts,
+  mapReviews,
+} = require('../utils/imageUrls');
+
+// Image rows are selected WITHOUT their base64 `url` blob — responses carry
+// /api/images/product/<id> links instead (see utils/imageUrls.js), so the
+// multi-MB strings never leave Postgres.
 
 // Full include — use for detail / admin edit pages (all images + variants)
 const productInclude = {
-  images: { orderBy: { order: 'asc' } },
+  images: { orderBy: { order: 'asc' }, select: productImageSelect },
   variants: true,
   categories: { select: { id: true, name: true, slug: true } },
 };
 
 // Light include — use for listing endpoints. Returns only the primary
-// image so response payloads don't balloon when every row carries a
-// base64-encoded gallery.
+// image so response payloads don't balloon when every row carries a gallery.
 const productListInclude = {
   images: {
     where: { isPrimary: true },
     take: 1,
+    select: productImageSelect,
   },
   variants: {
     select: { id: true, size: true, color: true, colorHex: true, stock: true },
@@ -61,7 +72,7 @@ const listProducts = asyncHandler(async (req, res) => {
     limit: take,
     total,
     totalPages: Math.ceil(total / take),
-    products,
+    products: mapProducts(products),
   });
 });
 
@@ -73,7 +84,7 @@ const featured = asyncHandler(async (req, res) => {
     include: productListInclude,
     orderBy: { createdAt: 'desc' },
   });
-  res.json({ success: true, products });
+  res.json({ success: true, products: mapProducts(products) });
 });
 
 // GET /api/products/new-arrivals
@@ -84,7 +95,7 @@ const newArrivals = asyncHandler(async (req, res) => {
     include: productListInclude,
     orderBy: { createdAt: 'desc' },
   });
-  res.json({ success: true, products });
+  res.json({ success: true, products: mapProducts(products) });
 });
 
 // GET /api/products/category/:categorySlug
@@ -95,7 +106,7 @@ const byCategory = asyncHandler(async (req, res) => {
     include: productListInclude,
     orderBy: { createdAt: 'desc' },
   });
-  res.json({ success: true, products });
+  res.json({ success: true, products: mapProducts(products) });
 });
 
 // GET /api/products/:slug — full detail, all images
@@ -127,7 +138,12 @@ const getProduct = asyncHandler(async (req, res) => {
       })
     : [];
 
-  res.json({ success: true, product, related });
+  const mapped = mapProductImages(product);
+  // Review rows still carry their base64 images[] out of the DB (few rows) —
+  // swap them for indexed /api/images/review URLs before responding.
+  if (Array.isArray(mapped.reviews)) mapped.reviews = mapReviews(mapped.reviews);
+
+  res.json({ success: true, product: mapped, related: mapProducts(related) });
 });
 
 // -------------------- ADMIN --------------------
@@ -139,7 +155,7 @@ const adminGetProduct = asyncHandler(async (req, res) => {
     include: productInclude,
   });
   if (!product) throw new ApiError(404, 'Product not found');
-  res.json({ success: true, product });
+  res.json({ success: true, product: mapProductImages(product) });
 });
 
 // POST /api/admin/products
@@ -199,7 +215,7 @@ const createProduct = asyncHandler(async (req, res) => {
     include: productInclude,
   });
 
-  res.status(201).json({ success: true, product });
+  res.status(201).json({ success: true, product: mapProductImages(product) });
 });
 
 // PUT /api/admin/products/:id
@@ -306,7 +322,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     });
   });
 
-  res.json({ success: true, product });
+  res.json({ success: true, product: mapProductImages(product) });
 });
 
 // DELETE /api/admin/products/:id
@@ -345,7 +361,7 @@ const adminListProducts = asyncHandler(async (req, res) => {
     limit: take,
     total,
     totalPages: Math.ceil(total / take),
-    products,
+    products: mapProducts(products),
   });
 });
 
@@ -427,7 +443,10 @@ const uploadImages = asyncHandler(async (req, res) => {
     return rows;
   });
 
-  res.json({ success: true, images: created });
+  res.json({
+    success: true,
+    images: created.map((img) => ({ ...img, url: productImageUrl(img.id) })),
+  });
 });
 
 // DELETE /api/admin/products/:id/images/:imageId

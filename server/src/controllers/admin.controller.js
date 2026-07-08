@@ -1,5 +1,6 @@
 const prisma = require('../config/db');
 const { asyncHandler } = require('../utils/errorHandler');
+const { productImageUrl } = require('../utils/imageUrls');
 
 function startOfMonth(date = new Date()) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -107,15 +108,18 @@ const topProducts = asyncHandler(async (req, res) => {
   const productIds = grouped.map((g) => g.productId);
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
-    include: { images: { where: { isPrimary: true }, take: 1 } },
+    include: {
+      images: { where: { isPrimary: true }, take: 1, select: { id: true } },
+    },
   });
 
   const data = grouped.map((g) => {
     const product = products.find((p) => p.id === g.productId);
+    const imageId = product?.images?.[0]?.id;
     return {
       productId: g.productId,
       name: product?.name,
-      image: product?.images?.[0]?.url,
+      image: imageId ? productImageUrl(imageId) : undefined,
       unitsSold: g._sum.quantity,
       revenue: Number(g._sum.total),
     };

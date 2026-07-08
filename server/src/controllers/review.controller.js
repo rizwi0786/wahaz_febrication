@@ -1,5 +1,6 @@
 const prisma = require('../config/db');
 const { ApiError, asyncHandler } = require('../utils/errorHandler');
+const { mapReview, mapReviews } = require('../utils/imageUrls');
 
 async function recalcProductRating(productId) {
   const agg = await prisma.review.aggregate({
@@ -23,7 +24,8 @@ const getProductReviews = asyncHandler(async (req, res) => {
     include: { user: { select: { id: true, name: true, avatar: true } } },
     orderBy: { createdAt: 'desc' },
   });
-  res.json({ success: true, reviews });
+  // Swap the base64 images[] for /api/images/review/<id>/<idx> links.
+  res.json({ success: true, reviews: mapReviews(reviews) });
 });
 
 // POST /api/reviews
@@ -59,7 +61,11 @@ const createReview = asyncHandler(async (req, res) => {
         images: Array.isArray(images) ? images : [],
       },
     });
-    res.status(201).json({ success: true, review, message: 'Review submitted; awaiting approval.' });
+    res.status(201).json({
+      success: true,
+      review: mapReview(review),
+      message: 'Review submitted; awaiting approval.',
+    });
   } catch (err) {
     if (err.code === 'P2002') {
       throw new ApiError(409, 'You have already reviewed this product');
@@ -87,7 +93,7 @@ const updateReview = asyncHandler(async (req, res) => {
     },
   });
   await recalcProductRating(updated.productId);
-  res.json({ success: true, review: updated });
+  res.json({ success: true, review: mapReview(updated) });
 });
 
 // DELETE /api/reviews/:id
@@ -111,7 +117,7 @@ const approveReview = asyncHandler(async (req, res) => {
     data: { isApproved: true },
   });
   await recalcProductRating(review.productId);
-  res.json({ success: true, review });
+  res.json({ success: true, review: mapReview(review) });
 });
 
 // GET /api/admin/reviews
@@ -129,7 +135,7 @@ const listAllReviews = asyncHandler(async (req, res) => {
     },
     orderBy: { createdAt: 'desc' },
   });
-  res.json({ success: true, reviews });
+  res.json({ success: true, reviews: mapReviews(reviews) });
 });
 
 module.exports = {
