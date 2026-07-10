@@ -45,10 +45,23 @@ app.use(
 
 // In production, refuse plain HTTP — redirect to HTTPS so cookies and
 // payment payloads never travel in the clear.
+//
+// The redirect MUST target the public host from CLIENT_URL, not
+// req.headers.host: ARR proxies with Host: localhost:5000 and reverse-
+// rewrites any Location header pointing there back to the visitor's
+// original host AND scheme — which turned this https redirect into an
+// http->http self-loop for plain-http visitors. A Location with the real
+// public host passes through ARR untouched.
 if (process.env.NODE_ENV === 'production' && process.env.FORCE_HTTPS !== 'false') {
+  let canonicalHost = null;
+  try {
+    canonicalHost = new URL((process.env.CLIENT_URL || '').split(',')[0].trim()).host;
+  } catch {
+    /* no usable CLIENT_URL — fall back to the request host */
+  }
   app.use((req, res, next) => {
     if (req.secure || req.headers['x-forwarded-proto'] === 'https') return next();
-    return res.redirect(308, `https://${req.headers.host}${req.url}`);
+    return res.redirect(308, `https://${canonicalHost || req.headers.host}${req.url}`);
   });
 }
 
